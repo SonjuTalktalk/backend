@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, Date, Enum, UniqueConstraint, Index
+from sqlalchemy import String, Date, Enum, UniqueConstraint, Index, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from src.db.database import Base
@@ -56,7 +56,7 @@ class User(Base):
     )
 
     point: Mapped[int] = mapped_column(
-        int,
+        Integer,
         nullable=False,
         default=0
     )
