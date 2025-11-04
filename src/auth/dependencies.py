@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from src.auth.cognito_config import cognito_auth
 from src.db.database import get_db
 from src.models.user.users import User
-
 security = HTTPBearer()                 # FastAPI의 내장 HTTPBearer 보안 스키마를 사용해서 클라이언트 요청의 헤더에 포함된 토큰을 자동으로 추출
 
 async def get_current_user_cognito_id(
@@ -37,4 +36,5 @@ async def get_current_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="사용자를 찾을 수 없습니다"
         )
+        
     return user

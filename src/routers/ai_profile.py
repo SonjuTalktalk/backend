@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from src.auth.dependencies import get_current_user
 from src.db.database import get_db
 from src.models.user.users import User
-from src.models.user.ai import AiProfile, Personality, SpeechStyle
+from src.models.user.ai import AiProfile, Personality
 
 router = APIRouter(prefix="/ai", tags=["AI 프로필"])
 
@@ -13,8 +13,6 @@ router = APIRouter(prefix="/ai", tags=["AI 프로필"])
 class CreateAiProfileRequest(BaseModel):
     nickname: str = Field(..., max_length=50)
     personality: Personality
-    speech_style: SpeechStyle
-
 
 
 # ai 프로필 생성
@@ -33,7 +31,6 @@ def create_ai_profile(
         owner_id=current_user.id,
         nickname=body.nickname,
         personality=body.personality,
-        speech_style=body.speech_style,
     
     )
     db.add(new_profile)
@@ -46,7 +43,6 @@ def create_ai_profile(
 class AiProfileResponse(BaseModel):
     nickname: str
     personality: Personality
-    speech_style: SpeechStyle
 
     class Config:
         from_attributes = True 
@@ -88,11 +84,8 @@ def update_my_nickname(
 
 # 성격/말투/감정 수정 요청 스키마
 class PrefsUpdateRequest(BaseModel):
-    personality: Personality | None = None
-    speech_style: SpeechStyle | None = None
+    personality: Personality 
 
-    
-    
 # 성격/말투/감정 수정
 @router.put("/preferences", response_model=AiProfileResponse)
 def update_preferences(
@@ -106,9 +99,6 @@ def update_preferences(
 
     if body.personality is not None:
         profile.personality = body.personality
-    if body.speech_style is not None:
-        profile.speech_style = body.speech_style
-
 
     db.commit()
     db.refresh(profile)

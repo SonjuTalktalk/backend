@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import date
-from src.models.user.users import User, Gender
+from src.models.user.users import User
 from src.auth.dependencies import get_current_user
 from src.db.database import get_db
 
@@ -14,8 +14,9 @@ class UserProfileResponse(BaseModel):
     id: str
     phone_number: str
     name: str
-    gender: Gender
+    gender: str
     birthdate: date
+    point: int
 
     class Config:
         from_attributes = True  

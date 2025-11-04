@@ -1,31 +1,18 @@
-import uuid
-from sqlalchemy import String, Date, Enum, UniqueConstraint, Index, Integer
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-import enum
-from src.db.database import Base
 
-class Gender(str, enum.Enum):
-    male = "남자"
-    female = "여자"
+from sqlalchemy import String, Date, UniqueConstraint, Integer
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from src.db.database import Base
 
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("cognito_id", name="uq_users_cognito_id"),
         UniqueConstraint("phone_number", name="uq_users_phone_number"),
-        Index("ix_users_name", "name"),
     )
-
-    # 내부 고유 PK: UUID 문자열(36자)
-    id: Mapped[str] = mapped_column(
-        String(36),
-        primary_key=True,
-        default=lambda: str(uuid.uuid4())
-    )
-
 
     cognito_id: Mapped[str] = mapped_column(
         String(64),
+        primary_key=True,
         nullable=False,
         unique=True,
         index=True
@@ -45,8 +32,8 @@ class User(Base):
         nullable=False
     )
     
-    gender: Mapped[Gender] = mapped_column(
-        Enum(Gender), 
+    gender: Mapped[str] = mapped_column(
+        String(10), 
         nullable=True
     )
     

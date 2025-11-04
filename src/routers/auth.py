@@ -4,8 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from datetime import date
 from src.db.database import get_db
-from src.models.user.users import User, Gender
-from src.auth.dependencies import get_current_user
+from src.models.user.users import User
 
 router = APIRouter(prefix="/auth", tags=["인증"])
 
@@ -14,10 +13,10 @@ router = APIRouter(prefix="/auth", tags=["인증"])
 class SignUpRequest(BaseModel):
     phone_number: str = Field(...)
     cognito_id: str = Field(...)
-    gender: Gender = Field(...)
+    gender: str = Field(...)
     birthdate: date = Field(...)
     name : str = Field(...)
-
+    point : int = Field(default=0)
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def signup(
@@ -60,8 +59,9 @@ async def signup(
         cognito_id=request.cognito_id,
         gender=request.gender,
         birthdate=request.birthdate,
-        name=request.name    # 초기 이름은 전화번호로 설정 (추후 프로필 수정에서 변경 가능
-    
+        name=request.name,
+        point=request.point
+        
     )
     
     db.add(new_user)                                     # 새 User 객체를 세션에 추가 준비
