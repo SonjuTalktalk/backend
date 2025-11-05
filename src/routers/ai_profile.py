@@ -23,7 +23,7 @@ def create_ai_profile(
     db: Session = Depends(get_db),
 ):
     """AI 프로필 신규 생성 (유저 1명당 1개 제한)"""
-    exists = db.query(AiProfile).filter(AiProfile.owner_id == current_user.id).first()
+    exists = db.query(AiProfile).filter(AiProfile.owner_cognito_id == current_user.cognito_id).first()
     if exists:
         raise HTTPException(status_code=409, detail="이미 AI 프로필이 존재합니다.")
 
@@ -54,11 +54,11 @@ def get_my_ai_profile(
     db: Session = Depends(get_db),
 ):
     """로그인한 유저의 AI 프로필 전체 조회"""
-    profile = db.query(AiProfile).filter(AiProfile.owner_id == current_user.id).first()
+    profile = db.query(AiProfile).filter(AiProfile.owner_cognito_id == current_user.cognito_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="AI 프로필이 없습니다.")
     return profile
-
+ 
 
 
 # 닉네임 수정 요청 스키마
@@ -73,7 +73,7 @@ def update_my_nickname(
     db: Session = Depends(get_db),
 ):
    
-    profile = db.query(AiProfile).filter(AiProfile.owner_id == current_user.id).first()
+    profile = db.query(AiProfile).filter(AiProfile.owner_cognito_id == current_user.cognito_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="AI 프로필이 없습니다.")
 
@@ -93,7 +93,7 @@ def update_preferences(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    profile = db.query(AiProfile).filter(AiProfile.owner_id == current_user.id).first()
+    profile = db.query(AiProfile).filter(AiProfile.owner_cognito_id == current_user.cognito_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="AI 프로필이 없습니다.")
 

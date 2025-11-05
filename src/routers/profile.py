@@ -11,7 +11,6 @@ router = APIRouter(prefix="/profile", tags=["프로필"])
 
 # 사용자 프로필 응답 스키마
 class UserProfileResponse(BaseModel):
-    id: str
     phone_number: str
     name: str
     gender: str

@@ -32,6 +32,7 @@ engine = create_engine(
     max_overflow=10         # 초과 시 임시로 늘릴 수 있는 연결 수
 )
 
+engine = create_engine(url, pool_pre_ping=True, pool_recycle=1800)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
