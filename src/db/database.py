@@ -1,8 +1,8 @@
 #aws RDS MySQL 연결 설정
-import os                                                   # 운영체제(OS) 환경 변수에 접근하기 위한 모듈
-from sqlalchemy import create_engine                        # SQLAlchemy의 DB 연결을 위한 엔진 생성용 함수
-from sqlalchemy.orm import sessionmaker, declarative_base   # ORM 세션과 모델(Base 클래스) 생성을 위한 도구
-from sqlalchemy.engine import URL                           # 데이터베이스 URL 생성용 클래스
+import os                                                   
+from sqlalchemy import create_engine                        
+from sqlalchemy.orm import sessionmaker, declarative_base   
+from sqlalchemy.engine import URL                           
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,7 +11,10 @@ load_dotenv()
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_HOST = os.getenv("DB_HOST", "localhost") 
-DB_PORT = os.getenv("DB_PORT")
+
+DB_PORT_RAW = os.getenv("DB_PORT")
+DB_PORT = int(DB_PORT_RAW) if DB_PORT_RAW else None
+
 DB_NAME = os.getenv("DB_NAME")
 
 # SQLAlchemy 데이터베이스 URL 구성
@@ -28,11 +31,10 @@ engine = create_engine(
     url,
     pool_pre_ping=True,     # 끊긴 커넥션 자동 감지 
     pool_recycle=1800,      # 30분마다 커넥션 새로고침
-    pool_size=5,            # 기본 커넥션 풀 크기 (동시 연결 수)
+    pool_size=5,            # 기본 커넥션 풀 크기 
     max_overflow=10         # 초과 시 임시로 늘릴 수 있는 연결 수
 )
 
-engine = create_engine(url, pool_pre_ping=True, pool_recycle=1800)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

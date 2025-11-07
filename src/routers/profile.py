@@ -43,7 +43,7 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-# 계정 삭제 (연관 AiProfile은 FK ondelete="CASCADE" + ORM cascade 로 자동 삭제)
+# 계정 삭제 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_my_account(
     current_user: User = Depends(get_current_user),

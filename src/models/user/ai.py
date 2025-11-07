@@ -30,7 +30,7 @@ class AiProfile(Base):
 
     # 선호/스타일/감정/관심사(옵션)
     personality: Mapped[Personality] = mapped_column(Enum(Personality), nullable=False, default=Personality.friendly)
-
+    
 
     user = relationship(
         "User",
