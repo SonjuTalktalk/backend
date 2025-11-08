@@ -7,3 +7,6 @@ fastapi-cognito==2.4.0
 pydantic==2.5.0
 cryptography==41.0.7
 requests==2.31.0
+PyJWT>=2.9.0
+python-jose>=3.3.0
+cryptography>=43.0.0

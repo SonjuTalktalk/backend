@@ -4,7 +4,7 @@ import time
 from jose import jwk
 
 jwks_cache = {
-    "keys": None
+    "keys": None,
     "expires_at": 0
 }
 

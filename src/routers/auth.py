@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from datetime import date
 from src.db.database import get_db
 from src.models.user.users import User
-from src.auth.token_verifier import verify_cognito_token  # ✅ 네가 만든 토큰 검증 함수 import
+from src.auth.token_verifier import verify_id_token
 
 router = APIRouter(prefix="/auth", tags=["인증"])
 
@@ -17,10 +17,6 @@ class SignUpRequest(BaseModel):
     birthdate: date = Field(...)
     name : str = Field(...)
     point : int = Field(default=0)
-
-class LoginRequest(BaseModel):
-    token: str  # Cognito ID Token 또는 Access Token
-
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def signup(request: SignUpRequest, db: Session = Depends(get_db)):
@@ -77,49 +73,45 @@ async def signup(request: SignUpRequest, db: Session = Depends(get_db)):
         "name": new_user.name
     }
 
-@router.post("/login")
-async def login(request: LoginRequest, db: Session = Depends(get_db)):
+
+class LoginRequest(BaseModel):
+    # 프론트에서 보내는 camelCase 키도 자동 인식하도록
+    id_token: str = Field(alias="idToken")
+
+    class Config:
+        allow_population_by_field_name = True
+
+@router.post("/auth/login")
+def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
     로그인 엔드포인트
-    - 앱이 Cognito 로그인 후 받은 토큰을 전달
-    - 백엔드는 토큰을 검증한 뒤 DB 사용자 조회
+    - 클라이언트에서 Cognito 로그인 후 받은 access_token을 전달
+    - 서버는 access_token을 검증하고, DB 사용자 조회 후 로그인 처리
     """
 
-    # ✅ 1) Cognito 토큰 검증
-    payload = verify_cognito_token(request.token)
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="유효하지 않은 토큰입니다."
-        )
+    # 1) Access 토큰 검증
+    access_payload = verify_id_token(request.id_token)
+    if not access_payload:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "유효하지 않은 id_token")
 
-    # ✅ 2) Cognito sub(고유 ID) 가져오기
-    cognito_sub = payload.get("sub")
+    # 2) Cognito 사용자 ID(sub) 추출
+    cognito_sub = access_payload.get("sub")
     if not cognito_sub:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="토큰에 sub(사용자 ID)가 없습니다."
-        )
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "id_token에 sub 없음")
 
-    # ✅ 3) DB에서 사용자 조회
+    # 3) DB에서 사용자 조회
     user = db.query(User).filter(User.cognito_id == cognito_sub).first()
-
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="가입되지 않은 사용자입니다."
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "가입되지 않은 사용자")
 
-    # ✅ 4) 로그인 성공 — 사용자 정보 반환
+    # 4) 로그인 성공 — 사용자 정보 반환
     return {
-        "message": "로그인 성공",
-        "user": {
-            "cognito_id": user.cognito_id,
-            "name": user.name,
-            "phone_number": user.phone_number,
-            "gender": user.gender,
-            "birthdate": str(user.birthdate),
-            "point": user.point,
-        }
+        "login": "ok",
+        "user_id": user.cognito_id,
+        "name": user.name,
+        "phone_number": user.phone_number,
+        "gender": user.gender,
+        "birthdate": str(user.birthdate),
+        "point": user.point,
     }
     

@@ -7,6 +7,7 @@ from src.db.database import get_db
 from src.models.user.users import User
 from src.models.user.ai import AiProfile, Personality
 
+
 router = APIRouter(prefix="/ai", tags=["AI 프로필"])
 
 # 프로필 생성 요청 스키마
