@@ -22,13 +22,13 @@ def create_ai_profile(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """AI 프로필 신규 생성 (유저 1명당 1개 제한)"""
+    
     exists = db.query(AiProfile).filter(AiProfile.owner_cognito_id == current_user.cognito_id).first()
     if exists:
         raise HTTPException(status_code=409, detail="이미 AI 프로필이 존재합니다.")
 
     new_profile = AiProfile(
-        owner_id=current_user.id,
+        owner_cognito_id=current_user.cognito_id,
         nickname=body.nickname,
         personality=body.personality,
     
@@ -39,6 +39,7 @@ def create_ai_profile(
     return {"message": "AI 프로필이 생성되었습니다.", "nickname": new_profile.nickname}
 
 
+
 # 프로필 전체 조회 스키마
 class AiProfileResponse(BaseModel):
     nickname: str
@@ -46,6 +47,7 @@ class AiProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True 
+
 
 # ai프로필 전체 조회
 @router.get("/me", response_model=AiProfileResponse)
@@ -65,6 +67,7 @@ def get_my_ai_profile(
 class NicknameUpdateRequest(BaseModel):
     new_nickname: str = Field(..., max_length=50)
 
+
 # 닉네임 수정
 @router.put("/nickname")
 def update_my_nickname(
@@ -82,9 +85,11 @@ def update_my_nickname(
     db.refresh(profile)
     return {"message": "닉네임이 변경되었습니다.", "nickname": profile.nickname}
 
+
 # 성격/말투/감정 수정 요청 스키마
 class PrefsUpdateRequest(BaseModel):
     personality: Personality 
+
 
 # 성격/말투/감정 수정
 @router.put("/preferences", response_model=AiProfileResponse)

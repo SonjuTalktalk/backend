@@ -23,10 +23,7 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup(
-    request: SignUpRequest,                                    # 클라이언트가 보낸 JSON 데이터를 SignUpRequest 객체로 자동 변환.
-    db: Session = Depends(get_db)                              # 데이터베이스 연결 세션을 FastAPI의 의존성 주입(Dependency Injection) 으로 받아옴
-):
+async def signup(request: SignUpRequest, db: Session = Depends(get_db)):
     """
     회원가입 엔드포인트
     - 앱이 Cognito에 직접 가입 후 받은 정보를 백엔드 DB에 저장
@@ -37,11 +34,13 @@ async def signup(
     2. Cognito → 앱: cognito_id (sub) 발급
     3. 앱 → 백엔드: 이 API를 호출하여 사용자 정보 저장
     """
+    
+    
     # 이미 존재하는 전화번호인지 확인
     existing_user = (
-        db.query(User)                                         # SQLAlchemy ORM을 이용해 users 테이블을 조회
-        .filter(User.phone_number == request.phone_number)     # 전달받은 request.phone_number 값과 같은 전화번호가 이미 있는지 검사.
-        .first()                                               # 첫 번째 결과를 반환 (없으면 None)                               
+        db.query(User)                                         
+        .filter(User.phone_number == request.phone_number)     
+        .first()                                                                            
     )
     if existing_user:
         raise HTTPException(

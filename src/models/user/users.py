@@ -1,5 +1,6 @@
 
 from sqlalchemy import String, Date, UniqueConstraint, Integer
+from datetime import date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.database import Base
 
@@ -34,12 +35,12 @@ class User(Base):
     
     gender: Mapped[str] = mapped_column(
         String(10), 
-        nullable=True
+        nullable=False
     )
     
-    birthdate: Mapped[Date] = mapped_column(
+    birthdate: Mapped[date] = mapped_column(
         Date, 
-        nullable=True
+        nullable=False
     )
 
     point: Mapped[int] = mapped_column(

@@ -1,7 +1,10 @@
+# src/auth/dependencies.py
+from typing import TYPE_CHECKING
 from fastapi import Depends, HTTPException, status
 from fastapi import Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from fastapi_cognito import CognitoToken
 
 from src.auth.cognito_config import cognito_auth
 from src.db.database import get_db
@@ -12,35 +15,30 @@ security = HTTPBearer()                 # FastAPI의 내장 HTTPBearer 보안 �
 
 '''
 async def get_current_user_cognito_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    # access 토큰을 쓰고 있다면 access_auth_required로 바꿔도 됩니다.
+    token: CognitoToken = Depends(cognito_auth.auth_required)
 ) -> str:
-    token = credentials.credentials
-    try:
-        payload = cognito_auth.verify(token)
-        cognito_id = payload.get("sub")
-        if not cognito_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="토큰에 사용자 ID(sub)가 없습니다"
-            )
-        return cognito_id
-    except Exception as e:
+    cognito_id = token.get("sub")
+    if not cognito_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"토큰 검증 실패: {str(e)}"
+            detail="토큰에 사용자 ID(sub)가 없습니다"
         )
+    return cognito_id
 
 async def get_current_user(
     cognito_id: str = Depends(get_current_user_cognito_id),
     db: Session = Depends(get_db)
-) -> User:
+):
+    # ✅ 순환 방지: 런타임 시점에 임포트
+    from src.models.user.users import User
+
     user = db.query(User).filter(User.cognito_id == cognito_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="사용자를 찾을 수 없습니다"
+            detail="사용자를 찾을 수 없습니다. 회원가입이 필요합니다."
         )
-        
     return user
 '''
 

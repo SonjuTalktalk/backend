@@ -1,12 +1,11 @@
-from sqlalchemy import String, Enum, JSON, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import String, Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.ext.mutable import MutableList
 import enum
 from src.db.database import Base
-
+from enum import Enum
 
 # AI 성격/스타일/감정 표현 방식 열거형
-class Personality(str, enum.Enum):
+class Personality(str, Enum):
     friendly = "다정한"
     active = "활발한"
     pleasant = "유쾌한"
@@ -29,8 +28,12 @@ class AiProfile(Base):
     )
 
     # 선호/스타일/감정/관심사(옵션)
-    personality: Mapped[Personality] = mapped_column(Enum(Personality), nullable=False, default=Personality.friendly)
-
+    personality: Mapped[Personality] = mapped_column(
+        Enum(Personality), 
+        nullable=False, 
+        default=Personality.friendly
+    )
+    
 
     user = relationship(
         "User",
