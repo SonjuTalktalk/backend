@@ -1,3 +1,4 @@
+# 인증 관련 API 엔드포인트 (회원가입)
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
