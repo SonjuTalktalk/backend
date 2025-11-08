@@ -87,9 +87,7 @@ async def lifespan(app: FastAPI):
 
     # 매일 00:00에 실행(원문)
     scheduler.add_job(_job, CronTrigger(hour=0, minute=0))
-    
-    # # 테스트용: 30초마다 실행
-    #scheduler.add_job(_job, CronTrigger(second="*/30"))  
+       
     scheduler.start()  
 
     try:
@@ -122,5 +120,3 @@ async def root():
         "message": "COOP Team7 API가 정상 작동 중입니다",
         "version": "1.0.0"
     }
-
-

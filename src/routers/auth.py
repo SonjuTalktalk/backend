@@ -78,8 +78,8 @@ class LoginResponse(BaseModel):
     cognito_id: str
     phone_number: str
     name: str
-    gender: str | None = None
-    birthdate: date | None = None
+    gender: str 
+    birthdate: date
     point: int
 
     class Config:
@@ -88,6 +88,8 @@ class LoginResponse(BaseModel):
 
 @router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
 async def login(current_user: User = Depends(get_current_user)):
+    
+    
     """
     Cognito JWT를 Authorization 헤더로 받는다.
     - 헤더 예시: Authorization: Bearer <JWT>
