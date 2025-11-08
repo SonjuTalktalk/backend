@@ -5,10 +5,9 @@ from pydantic import BaseModel, Field
 from datetime import date
 from src.db.database import get_db
 from src.models.user.users import User
-from src.auth.dependencies import get_current_user
+from src.auth.token_verifier import verify_cognito_token  # ✅ 네가 만든 토큰 검증 함수 import
 
 router = APIRouter(prefix="/auth", tags=["인증"])
-
 
 # 회원가입 요청 스키마
 class SignUpRequest(BaseModel):
@@ -18,6 +17,10 @@ class SignUpRequest(BaseModel):
     birthdate: date = Field(...)
     name : str = Field(...)
     point : int = Field(default=0)
+
+class LoginRequest(BaseModel):
+    token: str  # Cognito ID Token 또는 Access Token
+
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def signup(request: SignUpRequest, db: Session = Depends(get_db)):
@@ -52,7 +55,7 @@ async def signup(request: SignUpRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="이미 등록된 Cognito ID입니다"
         )
-    
+
     # 새 사용자 생성
     new_user = User(
         phone_number=request.phone_number,
@@ -61,41 +64,62 @@ async def signup(request: SignUpRequest, db: Session = Depends(get_db)):
         birthdate=request.birthdate,
         name=request.name,
         point=request.point
-        
+
     )
-    
-    db.add(new_user)                                   
-    db.commit()                                         
-    db.refresh(new_user)
-    
+
+    db.add(new_user)                                     # 새 User 객체를 세션에 추가 준비
+    db.commit()                                          # 변경사항을 데이터베이스에 커밋하여 실제로 저장
+    db.refresh(new_user)                                 # 새로 생성된 사용자의 최신 상태를 가져옴
+
     return {
         "message": "회원가입이 완료되었습니다",
         "phone_number": new_user.phone_number,
         "name": new_user.name
     }
 
-class LoginResponse(BaseModel):
-    cognito_id: str
-    phone_number: str
-    name: str
-    gender: str 
-    birthdate: date
-    point: int
-
-    class Config:
-        from_attributes = True  
-
-
-@router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
-async def login(current_user: User = Depends(get_current_user)):
-    
-    
+@router.post("/login")
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
-    Cognito JWT를 Authorization 헤더로 받는다.
-    - 헤더 예시: Authorization: Bearer <JWT>
-    - get_current_user가 토큰 검증 후 DB(User)에서 유저를 찾아 반환한다.
-    - 예외:
-      * 401: 토큰 불량/만료
-      * 404: 토큰은 유효하지만 로컬 DB에 유저 없음(회원가입 필요)
+    로그인 엔드포인트
+    - 앱이 Cognito 로그인 후 받은 토큰을 전달
+    - 백엔드는 토큰을 검증한 뒤 DB 사용자 조회
     """
-    return current_user
+
+    # ✅ 1) Cognito 토큰 검증
+    payload = verify_cognito_token(request.token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 토큰입니다."
+        )
+
+    # ✅ 2) Cognito sub(고유 ID) 가져오기
+    cognito_sub = payload.get("sub")
+    if not cognito_sub:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="토큰에 sub(사용자 ID)가 없습니다."
+        )
+
+    # ✅ 3) DB에서 사용자 조회
+    user = db.query(User).filter(User.cognito_id == cognito_sub).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="가입되지 않은 사용자입니다."
+        )
+
+    # ✅ 4) 로그인 성공 — 사용자 정보 반환
+    return {
+        "message": "로그인 성공",
+        "user": {
+            "cognito_id": user.cognito_id,
+            "name": user.name,
+            "phone_number": user.phone_number,
+            "gender": user.gender,
+            "birthdate": str(user.birthdate),
+            "point": user.point,
+        }
+    }
+    

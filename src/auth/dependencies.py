@@ -1,23 +1,19 @@
 # src/auth/dependencies.py
 from typing import TYPE_CHECKING
 from fastapi import Depends, HTTPException, status
+from fastapi import Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from fastapi_cognito import CognitoToken
 
 from src.auth.cognito_config import cognito_auth
 from src.db.database import get_db
+from src.models.user.users import User
+from src.auth.token_verifier import verify_cognito_token
+security = HTTPBearer()                 # FastAPI의 내장 HTTPBearer 보안 스키마를 사용해서 클라이언트 요청의 헤더에 포함된 토큰을 자동으로 추출
 
-# (선택) 타입체킹 전용 임포트 – 런타임 순환 방지
-if TYPE_CHECKING:
-    from src.models.user.users import User
 
-# (선택) Swagger 설명용 보안 스키마가 필요 없으면 삭제해도 됩니다.
-from fastapi.security import HTTPBearer
-security = HTTPBearer(
-    scheme_name="HTTPBearer",
-    description="Cognito JWT 토큰을 입력하세요"
-)
-
+'''
 async def get_current_user_cognito_id(
     # access 토큰을 쓰고 있다면 access_auth_required로 바꿔도 됩니다.
     token: CognitoToken = Depends(cognito_auth.auth_required)
@@ -44,3 +40,19 @@ async def get_current_user(
             detail="사용자를 찾을 수 없습니다. 회원가입이 필요합니다."
         )
     return user
+'''
+
+def get_current_user(request: Request):
+    auth = request.headers.get("Authorization")
+    if not auth:
+        raise HTTPException(401, "인증 헤더 없음")
+    
+    token = auth.replace("Bearer ", "")
+    jwks = get_jwks()
+
+    try:
+        payload = verify_cognito_token(token, jwks)
+    except Exception:
+        raise HTTPException(401, "유효하지 않거나 만료된 토큰")
+    
+    return payload
