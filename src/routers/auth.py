@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from datetime import date
 from src.db.database import get_db
 from src.models.user.users import User
 from src.auth.token_verifier import verify_cognito_token  # ✅ 네가 만든 토큰 검증 함수 import
