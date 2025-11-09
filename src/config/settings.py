@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     db_port: int
     db_name: str
     
+    openai_api_key: str 
+    
     class Config:
         env_file = ".env"
 

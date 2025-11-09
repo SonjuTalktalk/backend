@@ -1,66 +1,31 @@
-import enum
-from sqlalchemy import DateTime, ForeignKey, String, Date, Text, UniqueConstraint, Integer, func
-from datetime import date
+# src/models/chat_history.py
+from sqlalchemy import ForeignKey, String, Date, Text, Time, Integer, func, Index
+from datetime import date, time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from models.user.ai import Personality
-from routers import ai_profile
 from src.db.database import Base
-
-class Sender(str, enum.Enum):
-    user = "user"
-    ai = "ai"   
 
 class ChatHistory(Base):
     __tablename__ = "chat_histories"
-    __table_args__ = (
-        UniqueConstraint("id", name="uq_chat_histories_id"),
-    )
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-        nullable=False,
-        unique=True,
-        index=True
-    )
-
+    # ▶ 복합 PK: 같은 유저-같은 방 안에서 chat_num 유일
     owner_cognito_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("users.cognito_id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
+        primary_key=True,
     )
-    
-    sender: Mapped[Sender] = mapped_column(
-        enum.Enum(Sender),
-        nullable=False
+    chat_list_num: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chat_num: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    tts_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    chat_date: Mapped[date] = mapped_column(Date, server_default=func.current_date(), nullable=False)
+    chat_time: Mapped[time] = mapped_column(Time(timezone=False), server_default=func.current_time(), nullable=False)
+
+    # 정렬/조회 최적화(선택)
+    __table_args__ = (
+        Index("idx_owner_list_num", "owner_cognito_id", "chat_list_num", "chat_num"),
+        Index("idx_owner_list_date_time", "owner_cognito_id", "chat_list_num", "chat_date", "chat_time"),
     )
 
-
-    message: Mapped[str] = mapped_column(
-        Text,
-        nullable=False
-    )
-
-    model: Mapped[ai_profile.Personality] = mapped_column(
-        enum.Enum(ai_profile.Personality), 
-        nullable=False, 
-        default=ai_profile.Personality.friendly
-    )
-
-    tts_path: Mapped[str | None] = mapped_column(
-        String(255),
-        nullable=True
-    )
-
-    timestamp: Mapped[str] = mapped_column(
-        DateTime,
-        server_default=func.current_timestamp(),
-        nullable=False
-    )
-    user = relationship(
-        "User",
-        back_populates="chat_histories",
-        uselist=False,      
-    )
+    user = relationship("User", back_populates="chat_histories", uselist=False)

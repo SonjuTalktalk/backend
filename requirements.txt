@@ -1,12 +1,28 @@
+# --- web & backend ---
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 sqlalchemy==2.0.23
 pymysql==1.1.0
-python-dotenv==1.0.0
-fastapi-cognito==2.4.0
-pydantic==2.5.0
-cryptography==41.0.7
 requests==2.31.0
-PyJWT>=2.9.0
+
+# --- validation/types ---
+pydantic>=2.10.0
+typing-extensions>=4.12.2
+
+# --- auth/jwt ---
+fastapi-cognito==2.4.0
 python-jose>=3.3.0
-cryptography>=43.0.0
+PyJWT>=2.9.0
+cryptography>=43.0.0   # ← 3.13에서는 43+ 권장
+
+# --- AI ---
+openai>=1.30.0
+python-dotenv>=1.0.1   # ← 중복 제거 및 상향
+
+# --- utils ---
+httpx>=0.27.0
+
+# --- dev tools ---
+pytest>=8.2.0
+black>=24.4.0
+flake8>=7.1.0

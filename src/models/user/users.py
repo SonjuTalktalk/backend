@@ -56,3 +56,10 @@ class User(Base):
         passive_deletes=True,
         uselist=False,               
     )
+
+    chat_histories = relationship(
+    "ChatHistory",
+    back_populates="user",
+    cascade="all, delete-orphan",
+    passive_deletes=True
+)

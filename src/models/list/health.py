@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import DateTime, ForeignKey, String, Date, Text, UniqueConstraint, Integer, func
+from sqlalchemy import DateTime, ForeignKey, String, Date, Text, UniqueConstraint, Integer
 from datetime import date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from models.user.ai import Personality
