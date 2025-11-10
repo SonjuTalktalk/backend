@@ -7,6 +7,8 @@ from src.db.database import get_db
 from src.models.user.users import User
 from src.models.user.ai import AiProfile, Personality
 
+from sonju_ai.core.chat_service import ChatService
+
 
 router = APIRouter(prefix="/ai", tags=["AI 프로필"])
 

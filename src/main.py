@@ -5,9 +5,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import text
+
 # from sqlalchemy import text : db.execute(text("DELETE FROM daily_challenge_picks"))실행시 필요
 
-from src.routers import auth, profile, ai_profile, challenge
+from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message
 from src.db.database import engine, Base, SessionLocal
 
 
@@ -25,13 +27,44 @@ async def lifespan(app: FastAPI):
     """
     scheduler = AsyncIOScheduler(timezone=ZoneInfo("Asia/Seoul"))
 
-    # def _job():
+    def _job():
         
+        db = SessionLocal()
+        try:
+            
+            
+             # 테이블 4개로 고정 코드
+            db.execute(text("DELETE FROM daily_challenge_picks"))
+        
+        
+            # 테이블 7일동안 저장해놓기
+            '''
+            db.execute(text("""
+                DELETE FROM daily_challenge_picks
+                WHERE date_for < DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            """)) 
+            db.commit()
+            '''
+            
+            
+            # challenge 모듈의 함수 직접 호출
+            challenge.pick_and_store_today(db)
+            print("[스케줄러] 오늘의 챌린지 자동 생성 완료")
+        except Exception as e:
+            print(f"[스케줄러 오류] {e}")
+        finally:
+            db.close()
+    
+
+    
+    
+    
+    # # 재뽑기 테스트용 작업
+    # def _job():
     #     db = SessionLocal()
     #     try:
             
-            
-    #          # 테이블 4개로 고정 코드
+    #         # 테이블 4개로 고정 코드
     #         # db.execute(text("DELETE FROM daily_challenge_picks"))
         
         
@@ -44,49 +77,18 @@ async def lifespan(app: FastAPI):
     #         db.commit()
     #         '''
             
-            
-    #         # challenge 모듈의 함수 직접 호출
-    #         challenge.pick_and_store_today(db)
-    #         print("[스케줄러] 오늘의 챌린지 자동 생성 완료")
+    #         rows = challenge.pick_and_store_today(db, replace=True)  # 테스트 중에는 True
+    #         print("[스케줄러] 재뽑기 완료:", [r.id for r in rows])
     #     except Exception as e:
-    #         print(f"[스케줄러 오류] {e}")
+    #         print("[스케줄러 오류]", e)
     #     finally:
-    #         db.close()
-    
-
-    
-    
-    
-    # 재뽑기 테스트용 작업
-    def _job():
-        db = SessionLocal()
-        try:
-            
-            # 테이블 4개로 고정 코드
-            # db.execute(text("DELETE FROM daily_challenge_picks"))
-        
-        
-            # 테이블 7일동안 저장해놓기
-            '''
-            db.execute(text("""
-                DELETE FROM daily_challenge_picks
-                WHERE date_for < DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-            """)) 
-            db.commit()
-            '''
-            
-            rows = challenge.pick_and_store_today(db, replace=True)  # 테스트 중에는 True
-            print("[스케줄러] 재뽑기 완료:", [r.id for r in rows])
-        except Exception as e:
-            print("[스케줄러 오류]", e)
-        finally:
-             db.close()
+    #          db.close()
 
 
 
 
     # 매일 00:00에 실행
-    #scheduler.add_job(_job, CronTrigger(hour=0, minute=0))
+    scheduler.add_job(_job, CronTrigger(hour=0, minute=0))
     #scheduler.add_job(_job, CronTrigger(second="*/30"))  # 테스트용: 30초마다 실행
     # 스케줄러 시작
     scheduler.start()  
@@ -113,6 +115,8 @@ app.include_router(auth.router)
 app.include_router(profile.router)   
 app.include_router(ai_profile.router)  
 app.include_router(challenge.router)  
+app.include_router(chat_lists.router)
+app.include_router(chat_message.router)
 
 # 확인용 엔드포인트
 @app.get("/")   

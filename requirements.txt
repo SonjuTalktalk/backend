@@ -12,7 +12,7 @@ typing-extensions>=4.12.2
 # --- auth/jwt ---
 fastapi-cognito==2.4.0
 python-jose>=3.3.0
-PyJWT>=2.9.0
+PyJWT>=1.7.1
 cryptography>=43.0.0   # ← 3.13에서는 43+ 권장
 
 # --- AI ---

@@ -1,2 +1,17 @@
-.env
+# Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.env
+.env.*
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+
+# Build
+dist/
+build/

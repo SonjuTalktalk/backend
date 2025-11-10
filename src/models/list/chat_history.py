@@ -19,8 +19,8 @@ class ChatHistory(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     tts_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    chat_date: Mapped[date] = mapped_column(Date, server_default=func.current_date(), nullable=False)
-    chat_time: Mapped[time] = mapped_column(Time(timezone=False), server_default=func.current_time(), nullable=False)
+    chat_date: Mapped[date] = mapped_column(Date, nullable=False)
+    chat_time: Mapped[time] = mapped_column(Time(timezone=False), nullable=False)
 
     # 정렬/조회 최적화(선택)
     __table_args__ = (

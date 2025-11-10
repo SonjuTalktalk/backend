@@ -80,8 +80,8 @@ class LoginRequest(BaseModel):
 
     class Config:
         validate_by_name = True
-        
-@router.post("/auth/login")
+
+@router.post("/login")
 def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
     로그인 엔드포인트
