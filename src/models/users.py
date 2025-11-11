@@ -69,8 +69,8 @@ class User(Base):
         passive_deletes=True
     )
 
-    health_memos = relationship(
-        "HealthMemo",
-        back_populates="user",
-        cascade="all, delete-orphan"
-    )
+    # health_memos = relationship(
+    #     "HealthMemo",
+    #     back_populates="user",
+    #     cascade="all, delete-orphan"
+    # )
