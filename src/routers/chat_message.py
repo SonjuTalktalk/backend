@@ -17,9 +17,9 @@ from src.models.ai import AiProfile
 
 router = APIRouter(prefix="/chats", tags=["채팅-메시지"])
 
-# -----------------------
+
 # 공용 스키마
-# -----------------------
+
 class CreateMessageReq(BaseModel):
     message: str
     chat_list_num: Optional[int] = None      # 비우면 새 방 자동
@@ -32,9 +32,15 @@ class MessageItem(BaseModel):
     tts_path: Optional[str]
     chat_date: str
     chat_time: str
+    
+class MessageItem_List(BaseModel):
+    chat_list_num: int
+    chat_num: int
+    message: str
+    
 
 class TurnResponse(BaseModel):
-    user: MessageItem
+    #user: MessageItem
     ai: MessageItem
 
 
@@ -56,7 +62,6 @@ def get_personalized_chat_service(user: User, db) -> ChatService:
 
     return ChatService(ai_name=ai_name, model_type=model_type)
 
-# 합쳐진 메시지+AI 생성
 # 합쳐진 메시지+AI 생성
 @router.post("/messages", response_model=TurnResponse)
 def append_message_with_ai(
@@ -89,9 +94,8 @@ def append_message_with_ai(
     )
     last_num = last[0] if last else 0
 
-    # ===============================
-    # A) 백필 루트: 마지막이 홀수면 AI만 생성
-    # ===============================
+    
+    # 백필 루트: 마지막이 홀수면 AI만 생성
     if last_num % 2 == 1:
         # 1) 마지막 홀수 user 메시지 조회(잠금)
         dangling_user = (
@@ -143,19 +147,19 @@ def append_message_with_ai(
             chat_time=now_ai.time(),
         )
         db.add(ai_row)
-        db.commit()          # ★ 여기서 한 번만 커밋
+        db.commit()          
         db.refresh(dangling_user)
         db.refresh(ai_row)
 
         return TurnResponse(
-            user=MessageItem(
-                chat_list_num=list_no,
-                chat_num=dangling_user.chat_num,
-                message=dangling_user.message,
-                tts_path=dangling_user.tts_path,
-                chat_date=str(dangling_user.chat_date),
-                chat_time=str(dangling_user.chat_time),
-            ),
+            # user=MessageItem(
+            #     chat_list_num=list_no,
+            #     chat_num=dangling_user.chat_num,
+            #     message=dangling_user.message,
+            #     tts_path=dangling_user.tts_path,
+            #     chat_date=str(dangling_user.chat_date),
+            #     chat_time=str(dangling_user.chat_time),
+            # ),
             ai=MessageItem(
                 chat_list_num=list_no,
                 chat_num=ai_row.chat_num,
@@ -166,9 +170,8 @@ def append_message_with_ai(
             ),
         )
 
-    # ===============================
-    # B) 정상 루트: 새 user + 새 AI 저장
-    # ===============================
+
+    # 정상 루트: 새 user + 새 AI 저장
     user_num = last_num + 1          # 홀수
     ai_num   = user_num + 1          # 짝수
 
@@ -225,19 +228,19 @@ def append_message_with_ai(
     )
     db.add(ai_row)
 
-    db.commit()              # ★ 여기서 커밋 한 번
+    db.commit()              
     db.refresh(user_row)
     db.refresh(ai_row)
 
     return TurnResponse(
-        user=MessageItem(
-            chat_list_num=list_no,
-            chat_num=user_row.chat_num,
-            message=user_row.message,
-            tts_path=user_row.tts_path,
-            chat_date=str(user_row.chat_date),
-            chat_time=str(user_row.chat_time),
-        ),
+        # user=MessageItem(
+        #     chat_list_num=list_no,
+        #     chat_num=user_row.chat_num,
+        #     message=user_row.message,
+        #     tts_path=user_row.tts_path,
+        #     chat_date=str(user_row.chat_date),
+        #     chat_time=str(user_row.chat_time),
+        # ),
         ai=MessageItem(
             chat_list_num=list_no,
             chat_num=ai_row.chat_num,
@@ -247,3 +250,41 @@ def append_message_with_ai(
             chat_time=str(ai_row.chat_time),
         ),
     )
+
+@router.get("/messages/{list_no}", response_model=List[MessageItem_List])
+def get_messages_of_room(
+    list_no: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    특정 방 번호의 '모든 대화' 반환
+    정렬: chat_date ASC → chat_time ASC → chat_num ASC (오래된 → 최신)
+    """
+    uid = current_user.cognito_id
+
+    rows = (
+        db.query(ChatHistory)
+        .filter(
+            ChatHistory.owner_cognito_id == uid,
+            ChatHistory.chat_list_num == list_no,
+        )
+        .order_by(
+            ChatHistory.chat_date.asc(),
+            ChatHistory.chat_time.asc(),
+            ChatHistory.chat_num.asc(),
+        )
+        .all()
+    )
+
+    return [
+        MessageItem_List(
+            chat_list_num=r.chat_list_num,
+            chat_num=r.chat_num,
+            message=r.message,
+            #tts_path=r.tts_path,
+            #chat_date=str(r.chat_date),
+            #chat_time=str(r.chat_time),
+        )
+        for r in rows
+    ]

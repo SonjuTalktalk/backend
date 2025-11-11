@@ -5,10 +5,10 @@ from src.db.database import Base
 
 # AI 성격/스타일/감정 표현 방식 열거형
 class Personality(str, enum.Enum):
-    friendly = "다정한"
-    active = "활발한"
-    pleasant = "유쾌한"
-    reliable = "듬직한"
+    friendly = "friendly"
+    active = "active"
+    pleasant = "pleasant"
+    reliable = "reliable"
 
 
 class AiProfile(Base):
@@ -34,7 +34,6 @@ class AiProfile(Base):
     )
 
     
-
     user = relationship(
         "User",
         back_populates="ai_profile",    
