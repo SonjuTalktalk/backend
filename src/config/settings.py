@@ -1,5 +1,7 @@
 # src/config/settings.py
 from pydantic_settings import BaseSettings
+from typing import Literal, Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     cognito_region: str
@@ -15,8 +17,4 @@ class Settings(BaseSettings):
     
     openai_api_key: str 
     
-    class Config:
-        env_file = ".env"
-
-
 settings = Settings()

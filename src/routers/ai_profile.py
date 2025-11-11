@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 
 from src.auth.dependencies import get_current_user
 from src.db.database import get_db
-from src.models.user.users import User
-from src.models.user.ai import AiProfile, Personality
+from src.models.users import User
+from src.models.ai import AiProfile, Personality
 
 from sonju_ai.core.chat_service import ChatService
 

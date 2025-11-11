@@ -1,10 +1,15 @@
-
 from sqlalchemy import String, Date, UniqueConstraint, Integer
 from datetime import date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.database import Base
+from typing import List, TYPE_CHECKING
 
+if TYPE_CHECKING:
+        from src.models.chat_history import ChatHistory
+        from src.models.ai import AiProfile
+        
 class User(Base):
+    
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("cognito_id", name="uq_users_cognito_id"),
@@ -49,7 +54,7 @@ class User(Base):
         default=0
     )
     
-    ai_profile = relationship(
+    ai_profile: Mapped["AiProfile"] = relationship(
         "AiProfile",
         back_populates="user",
         cascade="all, delete-orphan",
@@ -57,9 +62,15 @@ class User(Base):
         uselist=False,               
     )
 
-    chat_histories = relationship(
-    "ChatHistory",
-    back_populates="user",
-    cascade="all, delete-orphan",
-    passive_deletes=True
-)
+    chat_histories: Mapped[List["ChatHistory"]] = relationship(
+        "ChatHistory",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
+    health_memos = relationship(
+        "HealthMemo",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )

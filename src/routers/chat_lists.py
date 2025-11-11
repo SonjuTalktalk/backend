@@ -1,14 +1,13 @@
 # src/routers/chat_lists.py
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from typing import List, Optional
-from sqlalchemy.orm import Session, aliased
-from sqlalchemy import select, func, and_
+from typing import List
+from sqlalchemy.orm import Session
 
-from src.models.user.users import User
+from src.models.users import User
 from src.db.database import get_db
 from src.auth.dependencies import get_current_user
-from src.models.list.chat_history import ChatHistory
+from src.models.chat_history import ChatHistory
 
 router = APIRouter(prefix="/chats", tags=["채팅-목록"])
 

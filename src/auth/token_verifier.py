@@ -1,4 +1,5 @@
 # token_verifier.py
+import json
 import jwt
 import requests
 from jwt.algorithms import RSAAlgorithm
@@ -16,7 +17,8 @@ def public_key_for(token: str):
     key = next((k for k in jwks["keys"] if k.get("kid") == kid), None)
     if not key:
         return None
-    return RSAAlgorithm.from_jwk(key)
+    key_str = json.dumps(key)
+    return RSAAlgorithm.from_jwk(key_str)
 
 def verify_id_token(token: str):
     """

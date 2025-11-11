@@ -11,7 +11,7 @@ from sqlalchemy import select, delete, func
 from sqlalchemy.orm import Session
 
 from src.db.database import get_db
-from src.models.user.challenge import Challenges, DailyChallengePick
+from src.models.challenge import Challenges, DailyChallengePick
 
 router = APIRouter(prefix="/challenges", tags=["챌린지"])
 
