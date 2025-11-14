@@ -74,3 +74,10 @@ class User(Base):
     #     back_populates="user",
     #     cascade="all, delete-orphan"
     # )
+    
+    todo_lists = relationship(
+        "ToDoList",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,      # ondelete=CASCADE 신뢰
+    )

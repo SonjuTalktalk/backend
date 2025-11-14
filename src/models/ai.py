@@ -39,3 +39,4 @@ class AiProfile(Base):
         back_populates="ai_profile",    
         uselist=False,      
     )
+    

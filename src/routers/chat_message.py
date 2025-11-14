@@ -63,6 +63,9 @@ def get_personalized_chat_service(user: User, db) -> ChatService:
     return ChatService(ai_name=ai_name, model_type=model_type)
 
 # 합쳐진 메시지+AI 생성
+
+
+
 @router.post("/messages", response_model=TurnResponse)
 def append_message_with_ai(
     req: CreateMessageReq,
@@ -77,6 +80,20 @@ def append_message_with_ai(
 
     B) 마지막 chat_num이 짝수면(정상):
        - 이번 요청의 user 메시지 저장 → history 구성 → AI 생성/저장 → 두 레코드 반환
+       
+       
+    ---
+    
+    chat -> todo  흐름:
+    
+    1) front에서 @router.post("/messages") 호출시 메시지를 넘겨주면 db저장 후 ai가 메시지 분석
+    2) 메시지 분석시 할일 추가가 가능해보이면은 (요약 할일, 날짜(디폴트 오늘))도 보냄
+    
+    2-1) 총 반환은 ai의 messageItem과 분석된 할일,날짜 스키마임(추가예정)
+    3) 이때 front에서는 반환값이 2개라면 팝업을 띄워줘서 이 내용을 할일에 추가하시겠습니까 질문 받아야함
+    
+    3-1) 예라고 하면 todo쪽의 post를 불러서 추가해주면 됨
+    4) 그 후 계속 이어가면 됨
     """
     uid = current_user.cognito_id
     list_no = req.chat_list_num or next_chat_list_num(db, uid)
@@ -170,6 +187,7 @@ def append_message_with_ai(
             ),
         )
 
+    
 
     # 정상 루트: 새 user + 새 AI 저장
     user_num = last_num + 1          # 홀수

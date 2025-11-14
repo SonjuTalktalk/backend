@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 # from sqlalchemy import text : db.execute(text("DELETE FROM daily_challenge_picks"))실행시 필요
 
+from src.routers import todo
 from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message
 from src.db.database import engine, Base, SessionLocal
 
@@ -117,6 +118,7 @@ app.include_router(ai_profile.router)
 app.include_router(challenge.router)  
 app.include_router(chat_lists.router)
 app.include_router(chat_message.router)
+app.include_router(todo.router)
 
 # 확인용 엔드포인트
 @app.get("/")   
