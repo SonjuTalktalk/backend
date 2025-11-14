@@ -19,6 +19,7 @@ from src.services.todos import (
     list_today_incomplete,
     list_future_incomplete,
     list_completed,
+    toggle_complete
 )
 
 router = APIRouter(prefix="/todos", tags=["투두"])
@@ -48,8 +49,14 @@ class TodoItem(BaseModel):
             return None
         return v.strftime("%H:%M")
 
+class ToggleCompleteReq(BaseModel):
+    # 프론트가 완료/미완료를 바꾸고 싶은 todo_num들을 배열로 보냄
+    # 예: [3]  → 3번 하나만 토글
+    # 예: [1, 2, 5] → 1,2,5번을 한 번에 토글
+    todo_nums: List[int] = Field(..., min_length=1, description="완료 토글할 todo_num 목록")
 
-# ---------- 2. 삽입 ----------
+
+# ---------- 삽입 ----------
 @router.post("", response_model=TodoItem, status_code=201)
 def create_todo(
     req: CreateTodoReq,
@@ -68,7 +75,7 @@ def create_todo(
     )
 
 
-# ---------- 1. 삭제 (번호로) ----------
+# ---------- 삭제 (번호로) ----------
 @router.delete("/{todo_num}", status_code=204)
 def delete_todo(
     todo_num: int,
@@ -80,8 +87,52 @@ def delete_todo(
     if not ok:
         raise HTTPException(status_code=404, detail="Todo not found")
 
+
+
+# ---------- 수정 (완료/미완료) ----------
+@router.patch("/complete", response_model=List[TodoItem])
+def toggle_todo_complete(
+    req: ToggleCompleteReq,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    ✔ 프론트에서 여러 개의 todo_num을 한 번에 토글할 수 있는 엔드포인트
+    - todo_nums에 하나만 넣으면 단일 토글
+    - todo_nums에 여러 개 넣으면 여러 개 일괄 토글
+    - 토글 = is_completed True ↔ False 반전
     
-# ---------- 3. 수정 (날짜/시간/task) ----------
+    PATCH /todos/complete{
+    - "todo_nums": [1, 2, 5] 여러개
+    - "todo_nums": [3] 단일 }
+    
+    """
+    uid = current_user.cognito_id
+    updated_rows = []
+
+    for num in req.todo_nums:
+        row = toggle_complete(db, uid, num)
+        if row:
+            updated_rows.append(row)
+
+    if not updated_rows:
+        # 전부 못 찾았으면 404
+        raise HTTPException(status_code=404, detail="Todo not found")
+
+    return [
+        TodoItem(
+            owner_cognito_id=r.owner_cognito_id,
+            todo_num=r.todo_num,
+            task=r.task,
+            is_completed=r.is_completed,
+            due_date=r.due_date,
+            due_time=r.due_time,
+        )
+        for r in updated_rows
+    ]
+
+
+# ---------- 수정 (날짜/시간/task) ----------
 @router.patch("/{todo_num}", response_model=TodoItem)
 def patch_todo(
     todo_num: int,
@@ -108,6 +159,7 @@ def patch_todo(
         due_date=row.due_date,
         due_time=row.due_time,
     )
+
 
 
 # ---------- GET 4가지 뷰 ----------
