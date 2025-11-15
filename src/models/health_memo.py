@@ -7,6 +7,7 @@ from src.db.database import Base
 class HealthMemo(Base):
     __tablename__ = "health_memos"
 
+    # 복합 PK: cognito_id + memo_date (일지는 하루에 한 번만 쓸 수 있음)
     cognito_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("users.cognito_id", ondelete="CASCADE"),
