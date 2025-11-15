@@ -81,3 +81,10 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,      # ondelete=CASCADE 신뢰
     )
+
+    health_diaries = relationship(
+        "HealthDiary",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
