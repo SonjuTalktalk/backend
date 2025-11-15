@@ -29,6 +29,7 @@ def create_health_memo(
         )
     ).first()
 
+    # 1. 기존에 작성한 메모를 수정한거라면 원래 튜플에서 memo_text만 수정
     if memo:
         memo.memo_text = body.memo_text
         db.commit()
@@ -37,6 +38,8 @@ def create_health_memo(
             "message": "건강 일기가 수정되었습니다.",
             "date": memo.memo_date
         }
+        
+    # 2. 새로 작성한 메모라면 새 튜플 추가
     else:
         new_memo = HealthMemo(
             cognito_id=current_user.cognito_id,
