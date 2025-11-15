@@ -82,8 +82,8 @@ class User(Base):
         passive_deletes=True,      # ondelete=CASCADE 신뢰
     )
 
-    health_diaries = relationship(
-        "HealthDiary",
+    health_memos = relationship(
+        "HealthMemo",
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,

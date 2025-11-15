@@ -7,47 +7,47 @@ from src.db.database import get_db
 from src.models.users import User
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from src.models.health_diary import HealthDiary
+from src.models.health_memo import HealthMemo
 
 router = APIRouter(prefix="/health", tags=["건강"])
 
-class CreateHealthDiary(BaseModel):
-    diary_date: date
-    diary_text: str
+class CreateHealthMemo(BaseModel):
+    memo_date: date
+    memo_text: str
 
-@router.post("/diaries")
-def create_ai_profile(
-    body: CreateHealthDiary,
+@router.post("/memos")
+def create_health_memo(
+    body: CreateHealthMemo,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     
-    diary = db.query(HealthDiary).filter(
+    memo = db.query(HealthMemo).filter(
         and_(
-            HealthDiary.cognito_id == current_user.cognito_id,
-            HealthDiary.diary_date == body.diary_date
+            HealthMemo.cognito_id == current_user.cognito_id,
+            HealthMemo.memo_date == body.memo_date
         )
     ).first()
 
-    if diary:
-        diary.diary_text = body.diary_text
+    if memo:
+        memo.memo_text = body.memo_text
         db.commit()
-        db.refresh(diary)
+        db.refresh(memo)
         return {
             "message": "건강 일기가 수정되었습니다.",
-            "date": diary.diary_date
+            "date": memo.memo_date
         }
     else:
-        new_diary = HealthDiary(
+        new_memo = HealthMemo(
             cognito_id=current_user.cognito_id,
-            diary_date=body.diary_date,
-            diary_text=body.diary_text,
+            memo_date=body.memo_date,
+            memo_text=body.memo_text,
         )
-        db.add(new_diary)
+        db.add(new_memo)
         db.commit()
-        db.refresh(new_diary)
+        db.refresh(new_memo)
         return {
             "message": "건강 일기가 등록되었습니다.", 
-            "date": new_diary.diary_date
+            "date": new_memo.memo_date
         }
    
