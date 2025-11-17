@@ -15,7 +15,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Elastic Beanstalk 배포를 실행 (인기있는 액션 사용)
+      # [!!! 중요: 이 부분이 추가되어야 합니다 !!!]
+      # 코드를 deploy.zip 파일로 압축하는 단계
+      - name: Generate deployment package
+        run: zip -r deploy.zip . -x "*.git*"
+
+      # 2. Elastic Beanstalk 배포를 실행
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
         with:
@@ -23,13 +28,11 @@ jobs:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           
-          # --- !!여기는 님의 EB 정보로 수정!! ---
-          # (AWS EB 콘솔에서 애플리케이션 이름 확인)
+          # --- 님의 EB 정보 ---
           application_name: Coopteam7-beanstalk 
-          # (AWS EB 콘솔에서 환경 이름 확인)
           environment_name: Coopteam7-beanstalk-env
-          region: 'ap-northeast-2' # 님의 리전 (서울)
+          region: 'ap-northeast-2'
           
           # --- 기타 설정 ---
-          version_label: "gh-${{ github.sha }}" # 배포 버전에 고유 ID 부여
-          deployment_package: deploy.zip # 현재 폴더(프로젝트 전체)를 zip으로 압축
+          version_label: "gh-${{ github.sha }}" 
+          deployment_package: deploy.zip  # 위에서 만든 압축 파일을 배포
