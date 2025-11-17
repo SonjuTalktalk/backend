@@ -23,9 +23,4 @@ class HealthMemo(Base):
         Text,
         nullable=False)
 
-    # 정렬/조회 최적화(선택)
-    __table_args__ = (
-        Index("idx_owner_health_memo", "cognito_id", "memo_date"),
-    )
-
     user = relationship("User", back_populates="health_memos")
