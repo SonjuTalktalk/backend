@@ -32,4 +32,4 @@ jobs:
           
           # --- 기타 설정 ---
           version_label: "gh-${{ github.sha }}" # 배포 버전에 고유 ID 부여
-          deployment_package: '.' # 현재 폴더(프로젝트 전체)를 zip으로 압축
+          deployment_package: deploy.zip # 현재 폴더(프로젝트 전체)를 zip으로 압축
