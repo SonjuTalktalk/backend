@@ -1,0 +1,35 @@
+# GitHub Actions 워크플로우 이름
+name: Deploy Backend to Elastic Beanstalk
+
+# 이 워크플로우가 언제 실행될지 정의
+on:
+  push:
+    branches:
+      - main  # 'main' 브랜치에 push 이벤트가 발생할 때만 실행
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # 작업은 'ubuntu'라는 가상 머신에서 실행
+    steps:
+      # 1. GitHub 저장소의 코드를 가상 머신으로 가져옴
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Elastic Beanstalk 배포를 실행 (인기있는 액션 사용)
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          # --- 2단계에서 설정한 GitHub Secrets 사용 ---
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          
+          # --- !!여기는 님의 EB 정보로 수정!! ---
+          # (AWS EB 콘솔에서 애플리케이션 이름 확인)
+          application_name: Coopteam7-beanstalk 
+          # (AWS EB 콘솔에서 환경 이름 확인)
+          environment_name: Coopteam7-beanstalk-env
+          region: 'ap-northeast-2' # 님의 리전 (서울)
+          
+          # --- 기타 설정 ---
+          version_label: "gh-${{ github.sha }}" # 배포 버전에 고유 ID 부여
+          deployment_package: '.' # 현재 폴더(프로젝트 전체)를 zip으로 압축
