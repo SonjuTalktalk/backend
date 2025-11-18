@@ -1,4 +1,4 @@
-# src/models/health_diary.py
+# src/models/health_memo.py
 from sqlalchemy import ForeignKey, String, Date, Text, Time, Integer, func, Index
 from datetime import date, time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
