@@ -68,13 +68,7 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True
     )
-
-    # health_memos = relationship(
-    #     "HealthMemo",
-    #     back_populates="user",
-    #     cascade="all, delete-orphan"
-    # )
-    
+  
     todo_lists = relationship(
         "ToDoList",
         back_populates="user",
@@ -84,6 +78,13 @@ class User(Base):
 
     health_memos = relationship(
         "HealthMemo",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    health_medicine = relationship(
+        "HealthMedicine",
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,

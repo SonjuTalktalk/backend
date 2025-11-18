@@ -1,3 +1,4 @@
+# sonju_ai/utils/openai_client.py
 """
 OpenAI API 클라이언트
 손주톡톡 AI 모듈의 OpenAI API 통신 담당 (Chat + Vision + STT + TTS)
@@ -105,7 +106,8 @@ class OpenAIClient:
     def vision_completion(
         self,
         prompt: str,
-        image_path: str,
+        image_bytes: bytes,
+        image_type: str = "jpeg", # 기본값 jpeg, png도 가능
         max_tokens: int = 2000,
         temperature: float = 0.5,
         response_format: Optional[Dict] = None
@@ -124,23 +126,17 @@ class OpenAIClient:
             str: 분석 결과
         """
         try:
-            # 이미지 타입 판단 (URL or 로컬 파일)
-            if image_path.startswith("http"):
-                # URL 이미지
-                image_content = {
-                    "type": "image_url",
-                    "image_url": {"url": image_path}
-                }
-            else:
-                # 로컬 파일 → base64 인코딩
-                with open(image_path, "rb") as img_file:
-                    b64_string = base64.b64encode(img_file.read()).decode("utf-8")
-                
-                image_content = {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{b64_string}"}
-                }
+            # MIME 타입 결정
+            mime_type = "image/jpeg" if image_type.lower() != "png" else "image/png"
             
+            # base64 인코딩
+            b64_string = base64.b64encode(image_bytes).decode("utf-8")
+            image_content = {
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime_type};base64,{b64_string}"}
+            }
+
+
             messages = [
                 {
                     "role": "user",

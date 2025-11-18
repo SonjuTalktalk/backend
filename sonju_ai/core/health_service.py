@@ -1,3 +1,4 @@
+# sonju_ai/core/health_service.py
 """
 건강 관련 AI 서비스
 - 건강 메모 분석 (4단계 상태 판정)
@@ -109,7 +110,7 @@ class HealthService:
                 "error": f"분석 실패: {str(e)}"
             }
     
-    def extract_prescription_info(self, image_path: str) -> Dict:
+    def extract_prescription_info(self, image_bytes: bytes) -> Dict:
         """
         처방전/약봉투 이미지에서 정보 추출
         
@@ -131,6 +132,7 @@ class HealthService:
             }
         """
         try:
+            """
             # 입력 검증
             if not image_path or not image_path.strip():
                 logger.warning("빈 이미지 경로")
@@ -138,14 +140,14 @@ class HealthService:
                     "medicines": [],
                     "error": "이미지 경로가 없습니다"
                 }
-            
+            """
             # 프롬프트 가져오기
             system_prompt = get_prompt("prescription_ocr")
             
             # Vision API 호출
             response = self.client.vision_completion(
                 prompt=system_prompt,
-                image_path=image_path,
+                image_bytes=image_bytes,
                 response_format={"type": "json_object"}
             )
             

@@ -1,6 +1,6 @@
 # src/models/health_memo.py
-from sqlalchemy import ForeignKey, String, Date, Text, Time, Integer, func, Index
-from datetime import date, time
+from sqlalchemy import ForeignKey, String, Date, Text
+from datetime import date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.database import Base
 
@@ -17,10 +17,14 @@ class HealthMemo(Base):
     memo_date: Mapped[date] = mapped_column(
         Date, 
         primary_key=True,
-        nullable=False)
+    )
     
     memo_text: Mapped[str] = mapped_column(
         Text,
         nullable=False)
+
+    status: Mapped[str] = mapped_column(
+        String(7)
+    )
 
     user = relationship("User", back_populates="health_memos")
