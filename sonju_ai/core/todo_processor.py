@@ -1,12 +1,12 @@
 """
 손주톡톡 할일 추출 서비스
-대화에서 자동으로 할일과 루틴을 추출하는 AI 서비스
+대화에서 자동으로 일정/스케줄을 추출하는 AI 서비스
 """
 
 import logging
 import json
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List
 from datetime import datetime
 
 from sonju_ai.utils.openai_client import OpenAIClient
@@ -24,7 +24,7 @@ class TodoProcessor:
     
     def extract_todos_from_conversation(self, user_input: str, user_id: str) -> Dict:
         """
-        대화에서 할일과 루틴 추출
+        대화에서 일정/스케줄만 추출
         
         Args:
             user_input: 사용자 입력 텍스트
@@ -33,8 +33,8 @@ class TodoProcessor:
         Returns:
             dict: {
                 "tasks": [
-                    {"task": "병원 가기", "time": "내일 오전", "category": "건강"},
-                    {"task": "전화하기", "time": None, "category": "가족"}
+                    {"task": "병원 가기", "time": "내일 오전 10시"},
+                    {"task": "약 먹기", "time": "오늘 저녁"}
                 ]
             }
         """
@@ -44,27 +44,23 @@ class TodoProcessor:
             
             # AI에게 할일 추출 요청
             user_message = f"""
-다음 대화에서 할일이나 해야 할 것들을 추출해주세요:
+다음 대화에서 일정/스케줄만 추출해주세요:
 
 "{user_input}"
 
-위 텍스트에서 어르신이 해야 할 구체적인 행동이나 일정이 있다면 추출해주세요.
-단순한 대화나 과거 이야기는 제외하고, 실제로 해야 할 일만 추출해주세요.
+추출 기준:
+- 추출: 구체적인 행동 + 시간 (병원, 약속, 전화, 장보기, 약 먹기 등)
+- 제외: 학습 희망사항, 과거 이야기, 단순 대화
 
-카테고리 분류 기준:
-- 건강: 약, 병원, 운동, 건강검진 관련
-- 가족: 가족, 친구, 지인과의 연락·만남
-- 학습: 배우기, 공부, 익히기, 새로운 기능 습득
-- 일상: 가사, 장보기, 청소, 일상 생활 업무
-- 취미: 여가, 즐기기, 드라마, 음악, 영화, 오락
+task 작성: 최대한 짧고 간결하게 (2~5 단어)
+time 작성: 날짜/시간 명확하면 기록, 없으면 null
 
-응답은 반드시 다음 JSON 형식으로만 해주세요:
+응답 형식:
 {{
     "tasks": [
         {{
-            "task": "할일 내용",
-            "time": "시간 정보 (없으면 null)",
-            "category": "건강|가족|학습|일상|취미"
+            "task": "간결한 할일",
+            "time": "날짜/시간 또는 null"
         }}
     ]
 }}
@@ -100,8 +96,8 @@ class TodoProcessor:
             
             # JSON 안정성 강화: 앞뒤 불필요한 텍스트 제거
             json_str = json_match.group().strip()
-            json_str = re.sub(r'^[^{]*', '', json_str)  # JSON 앞 텍스트 제거
-            json_str = re.sub(r'[^}]*$', '', json_str)  # JSON 뒤 텍스트 제거
+            json_str = re.sub(r'^[^{]*', '', json_str)
+            json_str = re.sub(r'[^}]*$', '', json_str)
             
             result = json.loads(json_str)
             
@@ -117,8 +113,7 @@ class TodoProcessor:
                     # 필수 필드 보정
                     cleaned_task = {
                         "task": str(task.get("task", "")).strip(),
-                        "time": task.get("time"),
-                        "category": task.get("category", "일상")
+                        "time": task.get("time")
                     }
                     
                     # 빈 할일은 제외
@@ -129,7 +124,7 @@ class TodoProcessor:
             seen = set()
             unique_tasks = []
             for task in valid_tasks:
-                task_key = task["task"].lower().strip()  # 대소문자 구분 없이 중복 체크
+                task_key = task["task"].lower().strip()
                 if task_key not in seen:
                     seen.add(task_key)
                     unique_tasks.append(task)
@@ -167,10 +162,6 @@ class TodoProcessor:
             if task.get("time"):
                 task_text += f" ({task['time']})"
             
-            # 카테고리 추가
-            if task.get("category"):
-                task_text += f" - {task['category']}"
-            
             lines.append(task_text)
         
         return "\n".join(lines)
@@ -196,17 +187,11 @@ if __name__ == "__main__":
         # 테스트 케이스들
         test_cases = [
             "내일 오전 10시에 병원 가야 해요",
-            "손주한테 안부 전화 드려야 하는데 까먹을까봐 걱정이 에요",
             "카카오톡으로 사진 보내는 법 배우고 싶어요",
-            "매일 오후 3시에 약 먹어야 해",
-            "주말마다 공원에서 산책하려고 해요",
-            "오늘 날씨가 정말 좋네요",
-            "손주가 어제 왔었어요",
-            "내일 마트 가서 장보고, 저녁에는 드라마 봐야지",
-            "요즘 혈압약 깜빡깜빡 해서 알람 맞춰놔야겠어"
+            "내일 마트 가서 장보고, 저녁에는 드라마 봐야지"
         ]
         
-        print("=== 손주톡톡 할일 추출 테스트 ===")
+        print("=== 손주톡톡 할일 추출 테스트 ===\n")
         
         for user_input in test_cases:
             print(f"📝 입력: {user_input}")
@@ -214,8 +199,7 @@ if __name__ == "__main__":
             result = processor.extract_todos_from_conversation(user_input, "test_user")
             formatted = processor.format_extracted_todos(result)
             
-            print(f"✅ {formatted}")
-            
+            print(f"✅ {formatted}\n")
         
     except Exception as e:
         print(f"테스트 중 오류: {e}")
