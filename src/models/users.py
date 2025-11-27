@@ -108,6 +108,11 @@ class User(Base):
     daily_challenge_states = relationship(
         "DailyChallengeUserState",
         back_populates="owner",
+    )
+
+    item_buy_list = relationship(
+        "ItemBuyList",
+        back_populates="users",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )

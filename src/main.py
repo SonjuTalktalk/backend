@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import text
 
 from src.routers import todo
-from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message, health
+from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message, health, item
 from src.db.database import engine, Base, SessionLocal
 
 # 테이블 생성 (알렘빅 쓰면 이 줄은 빼도 됨)
@@ -82,6 +82,7 @@ app.include_router(chat_lists.router)
 app.include_router(chat_message.router)
 app.include_router(todo.router)
 app.include_router(health.router)
+app.include_router(item.router)
 
 
 # 확인용 엔드포인트
