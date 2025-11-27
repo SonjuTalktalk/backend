@@ -1,10 +1,12 @@
 # src/routers/item.py
 from fastapi import HTTPException, APIRouter, Depends, Query
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from src.auth.dependencies import get_current_user
 from src.db.database import get_db
 from src.models.users import User
-from sqlalchemy.orm import Session
+from src.models.item_buy_list import ItemBuyList
 
 router = APIRouter(prefix="/item", tags=["상점"])
 
