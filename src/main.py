@@ -11,12 +11,36 @@ from src.routers import todo
 from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message, health, item
 from src.db.database import engine, Base, SessionLocal
 
+import os
+import firebase_admin
+from firebase_admin import credentials
+
 # 테이블 생성 (알렘빅 쓰면 이 줄은 빼도 됨)
 Base.metadata.create_all(bind=engine)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    
+    key_path = "firebase-key.json"  # backend 폴더 바로 아래에 있어야 합니다.
+
+    # 1. 파일 존재 여부 확인 (안전장치)
+    if os.path.exists(key_path):
+        # 키 파일이 있으면 연결 시도
+        cred = credentials.Certificate(key_path)
+        
+        # 2. 이미 연결된 상태인지 확인 (FastAPI 재시작 시 에러 방지)
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app(cred)
+            print("✅ [성공] Firebase(FCM) 서버와 연결되었습니다!")
+        else:
+            print("ℹ️ [정보] Firebase가 이미 실행 중입니다.")
+    else:
+        # 키 파일이 없으면 경고만 출력 (서버 다운 방지)
+        print(f"⚠️ [경고] '{key_path}' 파일을 찾을 수 없습니다.")
+        print("👉 로컬 개발 시 루트 폴더에 키 파일을 넣어주세요. (알림 기능 제한됨)")
+        
+        
     """
     - 앱 시작 시 스케줄러 등록
     - 매일 00:00 KST마다 '어제 이전 daily 기록' 삭제

@@ -17,3 +17,6 @@ dist/
 build/
 
 venv/
+
+# Firebase Admin Private Key (FCM Master Key)
+firebase-key.json
