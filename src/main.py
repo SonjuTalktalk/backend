@@ -10,7 +10,7 @@ from sqlalchemy import text
 # from sqlalchemy import text : db.execute(text("DELETE FROM daily_challenge_picks"))실행시 필요
 
 from src.routers import todo
-from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message, health
+from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message, health, item
 from src.db.database import engine, Base, SessionLocal
 
 
@@ -18,7 +18,7 @@ from src.db.database import engine, Base, SessionLocal
 
 # 데이터베이스 테이블 생성 (처음 실행 시)
 Base.metadata.create_all(bind=engine)
-
+print("테이블 생성 완료")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -120,6 +120,7 @@ app.include_router(chat_lists.router)
 app.include_router(chat_message.router)
 app.include_router(todo.router)
 app.include_router(health.router)
+app.include_router(item.router)
 
 # 확인용 엔드포인트
 @app.get("/")   

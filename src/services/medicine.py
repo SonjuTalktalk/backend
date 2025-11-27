@@ -53,5 +53,7 @@ def create_medicine_routine(db: Session, body: CreateHealthMedicine, current_use
     return ResponseHealthMedicine(
         response_message = "복약 루틴이 등록되었습니다.",
         medicine_name = new_routine.medicine_name,
+        medicine_daily = new_routine.medicine_daily,
+        medicine_period = new_routine.medicine_period,
         medicine_date = new_routine.medicine_date
     )

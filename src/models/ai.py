@@ -2,6 +2,7 @@ from sqlalchemy import String, Enum as SqlEnum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from src.db.database import Base
+from sqlalchemy.dialects.mysql import SMALLINT
 
 # AI 성격/스타일/감정 표현 방식 열거형
 class Personality(str, enum.Enum):
@@ -14,7 +15,6 @@ class Personality(str, enum.Enum):
 class AiProfile(Base):
     __tablename__ = "ai_profiles"
     
-
     owner_cognito_id: Mapped[str] = mapped_column(
         ForeignKey("users.cognito_id", ondelete="CASCADE"),
         primary_key=True,     
@@ -33,10 +33,20 @@ class AiProfile(Base):
         default=Personality.friendly,
     )
 
-    
+    equipped_item: Mapped[int] = mapped_column(
+        SMALLINT(unsigned=True),
+        ForeignKey("item_list.item_number"),
+        default=1
+    )
+
     user = relationship(
         "User",
         back_populates="ai_profile",    
         uselist=False,      
+    )
+
+    item_list = relationship(
+        "ItemList",
+        back_populates="ai",
     )
     
