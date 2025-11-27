@@ -22,15 +22,11 @@ class ItemBuyList(Base):
     
     item_list = relationship(
         "ItemList", 
-        back_populates="item_buy_list",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
+        back_populates="item_buy_list"
     )
 
     users = relationship(
         "User", 
-        back_populates="item_buy_list",
-        cascade="all, delete-orphan",
-        passive_deletes=True, 
+        back_populates="item_buy_list"
     )
 

@@ -89,3 +89,10 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    item_buy_list = relationship(
+        "ItemBuyList",
+        back_populates="users",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
