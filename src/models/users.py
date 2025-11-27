@@ -1,8 +1,9 @@
-from sqlalchemy import String, Date, UniqueConstraint, Integer
+from sqlalchemy import String, Date, UniqueConstraint, Integer, Boolean
 from datetime import date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.database import Base
 from typing import List, TYPE_CHECKING
+
 
 if TYPE_CHECKING:
         from src.models.chat_history import ChatHistory
@@ -54,6 +55,12 @@ class User(Base):
         default=0
     )
     
+    is_premium : Mapped[Boolean] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
+    
     ai_profile: Mapped["AiProfile"] = relationship(
         "AiProfile",
         back_populates="user",
@@ -68,6 +75,7 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True
     )
+    
   
     todo_lists = relationship(
         "ToDoList",
@@ -86,6 +94,20 @@ class User(Base):
     health_medicine = relationship(
         "HealthMedicine",
         back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    
+    daily_challenges = relationship(
+        "DailyChallengePick",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,  
+    )
+
+    daily_challenge_states = relationship(
+        "DailyChallengeUserState",
+        back_populates="owner",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
