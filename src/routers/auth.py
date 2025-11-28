@@ -118,8 +118,6 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         "birthdate": str(user.birthdate),
         "point": user.point,
     }
-    
-router = APIRouter(prefix="/auth", tags=["인증"])
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(current_user: User = Depends(get_current_user)):
