@@ -1,7 +1,7 @@
 # src/routers/health.py
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from src.auth.dependencies import get_current_user
 from src.db.database import get_db
 from src.models.users import User
@@ -21,6 +21,7 @@ class CreateHealthMemo(BaseModel):
 
 class ResponseHealthMemo(BaseModel):
     response_message: str
+    memo_text: str
     memo_date: date
     status: str
 
@@ -32,8 +33,13 @@ class CreateHealthMedicine(BaseModel):
 
 class ResponseHealthMedicine(BaseModel):
     response_message: str
+    registered: bool
     medicine_name: str
+    medicine_daily: int
+    medicine_period: int
     medicine_date: date
+
+MAX_TEXT_BYTES = 65533
 
 @router.post("/memos", response_model=ResponseHealthMemo)
 def create_health_memo(
@@ -46,6 +52,13 @@ def create_health_memo(
     1. 기존에 있는 일지를 수정한 경우: '건강 요약 일지가 수정되었습니다.'
     2. 새로운 일지를 작성한 경우: '건강 요약 일지가 등록되었습니다.'
     """
+
+    if len(body.memo_text.encode('utf-8')) > MAX_TEXT_BYTES:
+        raise HTTPException(
+            status_code=400, 
+            detail="일지가 너무 깁니다."
+        )
+    
     memo = db.query(HealthMemo).filter(
         and_(
             HealthMemo.cognito_id == current_user.cognito_id,
@@ -61,9 +74,13 @@ def create_health_memo(
         memo.status = analysis.analyze_health_memo(body.memo_text)["status"]
         db.commit()
         db.refresh(memo)
-        message = "건강 요약 일지가 수정되었습니다."
-        memo_date = memo.memo_date
-        status = memo.status
+
+        response = ResponseHealthMemo(
+            response_message = "건강 요약 일지가 수정되었습니다.",
+            memo_text = memo.memo_text,
+            memo_date = memo.memo_date,
+            status = memo.status
+        )
         
         
     # 2. 새로 작성한 메모라면 새 튜플 추가 
@@ -77,38 +94,92 @@ def create_health_memo(
         db.add(new_memo)
         db.commit()
         db.refresh(new_memo)
-        message = "건강 요약 일지가 등록되었습니다."
-        memo_date = new_memo.memo_date
-        status = new_memo.status
 
-    return ResponseHealthMemo(
-        response_message = message,
-        memo_date = memo_date,
-        status = status
-    )
+        response = ResponseHealthMemo(
+            response_message = "건강 요약 일지가 등록되었습니다.",
+            memo_text = new_memo.memo_text,
+            memo_date = new_memo.memo_date,
+            status = new_memo.status
+        )
+        
+    return response
    
 @router.get("/memos")
 def get_health_memo(
-    requested_date: date = Query(...),
+    requested_date: date | None = Query(None),
+    requested_month: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    쿼리 파라미터 requested_date 필요함. \n
-    ex) /health/memos?requested_date=2025-11-18
-    \n
-    응답
+    쿼리 파라미터 requested_date나 requested_month 필요함. \n
+    둘 다 들어올 수는 없음 (400 Bad Request로 처리) \n
+
+    ## 1. requested_date
+    ex) /health/memos?requested_date=2025-11-18 \n
+    **응답**
     1. 해당 날짜에 일지가 있는 경우: 일지 텍스트 반환
     2. 해당 날짜에 일지가 없는 경우: 빈 문자열('') 반환
-    """
-    memo = db.query(HealthMemo).filter(
-        and_(
-            HealthMemo.cognito_id == current_user.cognito_id,
-            HealthMemo.memo_date == requested_date
-        )
-    ).first()
+
+    ## 2. requested_month
+    ex) /health/memos?requested_month=2025-11 \n
+    **응답** \n
+    해당 월에 작성한 모든 일지를 반환
+    \n
     
-    return memo.memo_text if memo else ""
+    """
+
+    if requested_date and requested_month:
+        raise HTTPException(
+            status_code=400, 
+            detail="requested_date와 requested_month 중 하나만 파리미터로 받을 수 있습니다."
+        )
+
+    if not requested_date and not requested_month:
+        raise HTTPException(
+            status_code=400, 
+            detail="쿼리 파라미터가 없습니다."
+        )
+
+    if requested_date:
+        memo = db.query(HealthMemo).filter(
+            and_(
+                HealthMemo.cognito_id == current_user.cognito_id,
+                HealthMemo.memo_date == requested_date
+            )
+        ).first()
+        response = ResponseHealthMemo(
+            response_message = f"{requested_date}에 작성한 건강 일지입니다." if memo else "해당 날짜에 작성한 건강 일지가 없습니다.",
+            memo_text = memo.memo_text if memo else "",
+            memo_date = requested_date,
+            status = memo.status if memo else ""
+        )
+
+    else:
+        year, month = map(int, requested_month.split("-"))
+        start_date = date(year, month, 1)
+        end_date = date(year, month, 28) + timedelta(days=4)
+        end_date = end_date.replace(day=1)
+
+        memos = db.query(HealthMemo).filter(
+            and_(
+                HealthMemo.cognito_id == current_user.cognito_id,
+                HealthMemo.memo_date >= start_date,
+                HealthMemo.memo_date < end_date
+            )
+        ).all()
+
+        response = [
+            ResponseHealthMemo(
+                response_message = f"{memo.memo_date}에 작성한 건강 일지입니다.",
+                memo_text = memo.memo_text,
+                memo_date = memo.memo_date,
+                status = memo.status
+            )
+            for memo in memos
+        ]
+
+    return response
     
 @router.post("/medicine", response_model=ResponseHealthMedicine)
 def create_health_medicine(
@@ -117,13 +188,26 @@ def create_health_medicine(
     db: Session = Depends(get_db),
 ):
     """
-    응답 메시지
-    - '복약 루틴이 등록되었습니다.'
-
-    ---
+    ## 응답 \n
+    ### 1. 등록 성공 \n
+    { \n
+    "response_message": "복약 루틴이 등록되었습니다.", \n
+    "registered": true, \n
+    "medicine_name": "약이름", \n
+    "medicine_daily": "3(하루 세 번)", \n
+    "medicine_period": "3(3일치)", \n
+    "medicine_date": "2025-12-01" \n
+    } \n
     
-    약 이름과 투약 시작일이 동일한 경우 같은 루틴으로 취급하고 \n
-    409 Conflict 로 처리
+    ### 2. 등록 실패 \n
+    { \n
+    "response_message": "이미 등록된 복약 루틴입니다. 약 이름과 투약 시작일이 동일한 경우 같은 루틴으로 취급합니다.", \n
+    "registered": false, \n
+    "medicine_name": "약이름", \n
+    "medicine_daily": "3(하루 세 번)", \n
+    "medicine_period": "3(3일치)", \n
+    "medicine_date": "2025-12-01" \n
+    } \n
     """
     
     return create_medicine_routine(db, body, current_user)
@@ -139,23 +223,28 @@ async def create_health_medicine_automatically(
     클라이언트에서 이미지 파일을 서버로 전송 \n \n
 
     OCR을 통해 약 봉투 이미지 파일에서 필요한 내용 추출 \n
-
+    ---
     ## 응답 \n
+    ### 1. 등록 성공 \n
     { \n
     "response_message": "복약 루틴이 등록되었습니다.", \n
+    "registered": true, \n
     "medicine_name": "약이름", \n
-    "medicine_date": "2025-11-18" \n
-    } \n x 인식한 약 종류 갯수 만큼 \n
+    "medicine_daily": "3(하루 세 번)", \n
+    "medicine_period": "3(3일치)", \n
+    "medicine_date": "2025-12-01" \n
+    } \n
     
-    
-    약 이름과 투약 시작일이 동일한 경우 같은 루틴으로 취급하고 \n
-    409 Conflict 로 처리 \n
-    ---
-    ## (아직 처리되지 않은 예외케이스) \n
-    만약 수동으로 입력한 복약 루틴이 있고 \n
-    약 봉투에 기재된 복약 루틴 중 \n
-    첫 번째 약에 대한 복약 루틴만 수동 입력한 것과 겹칠 때 \n
-    두 번째 이후부터 중복되지 않는 복약 루틴을 등록하지 않은 채 409 Conflict로 응답함
+    ### 2. 등록 실패 \n
+    { \n
+    "response_message": "이미 등록된 복약 루틴입니다. 약 이름과 투약 시작일이 동일한 경우 같은 루틴으로 취급합니다.", \n
+    "registered": false, \n
+    "medicine_name": "약이름", \n
+    "medicine_daily": "3(하루 세 번)", \n
+    "medicine_period": "3(3일치)", \n
+    "medicine_date": "2025-12-01" \n
+    } \n
+
     """
     OCR = HealthService()
     content = await file.read()

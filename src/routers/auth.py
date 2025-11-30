@@ -6,6 +6,7 @@ from datetime import date
 from src.db.database import get_db
 from src.models.users import User
 from src.auth.token_verifier import verify_id_token
+from src.models.item_buy_list import ItemBuyList
 
 router = APIRouter(prefix="/auth", tags=["인증"])
 
@@ -66,6 +67,15 @@ async def signup(request: SignUpRequest, db: Session = Depends(get_db)):
     db.add(new_user)                                     # 새 User 객체를 세션에 추가 준비
     db.commit()                                          # 변경사항을 데이터베이스에 커밋하여 실제로 저장
     db.refresh(new_user)                                 # 새로 생성된 사용자의 최신 상태를 가져옴
+
+    default_purchase = ItemBuyList(
+        cognito_id=request.cognito_id,
+        item_number=1
+    )
+
+    db.add(default_purchase)                                    
+    db.commit()                                         
+    db.refresh(default_purchase)
 
     return {
         "message": "회원가입이 완료되었습니다",
