@@ -8,6 +8,10 @@ from src.models.users import User
 from src.auth.token_verifier import verify_id_token
 from src.models.item_buy_list import ItemBuyList
 
+from fastapi import APIRouter, Depends, status
+from src.auth.dependencies import get_current_user
+from src.models.users import User
+
 router = APIRouter(prefix="/auth", tags=["인증"])
 
 # 회원가입 요청 스키마
@@ -124,4 +128,60 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         "birthdate": str(user.birthdate),
         "point": user.point,
     }
-    
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(current_user: User = Depends(get_current_user)):
+    """
+    [로그아웃 엔드포인트 안내]
+
+    이 API의 역할
+
+    - 이 엔드포인트는 "로그아웃 요청"을 서버에 알려주는 용도입니다.
+    - 서버는 JWT(토큰)를 따로 저장하거나 세션을 관리하지 않습니다.
+      → 즉, 서버 쪽에서는 "로그인 상태"를 들고 있지 않기 때문에
+        이 API를 호출해도 서버가 무언가를 해제/삭제하진 않습니다.
+    - 대신, 이 API를 호출할 때 넘겨진 Authorization 헤더의 토큰이
+      *정상적인 유저의 유효한 토큰인지*를 한 번 검증합니다.
+      → 유효하지 않은 토큰이면 401/403 에러가 나고,
+        유효하면 200과 메시지만 돌려줍니다.
+
+
+    - "진짜 로그아웃" 효과는 **클라이언트가 토큰을 지워야** 발생합니다.
+    - 이 API는 단지 "서버 기준으로 유효한 유저가 로그아웃을 요청했다"는
+      이벤트만 남기는 수준입니다. (필요하면 나중에 로그/통계용으로 사용 가능)
+
+    프론트에서의 사용 예시 
+
+    1) 로그아웃 버튼 클릭 시:
+
+        - 현재 가지고 있는 idToken(또는 accessToken)을 Authorization 헤더에 넣고
+          `POST /auth/logout`을 호출합니다.
+
+          예시:
+          Authorization: Bearer <idToken>
+
+    2) 서버에서 200 OK가 오면:
+
+        - 디바이스에 저장해 둔 모든 인증 관련 토큰을 삭제해야 합니다.
+          (예: SecureStore / localStorage / AsyncStorage 등)
+
+          - idToken 삭제
+          - accessToken 삭제
+          - refreshToken 삭제 (사용 중인 경우)
+
+    3) 토큰 삭제 이후:
+
+        - 네이게이션을 로그인/온보딩 화면으로 초기화합니다.
+        - 이후부터는 Authorization 헤더에 토큰을 붙이지 않기 때문에,
+          보호된 API를 호출하면 서버에서 자동으로 401(인증 없음)을 응답하게 됩니다.
+
+    📌 요약
+
+    - 이 API만 호출한다고 해서 자동으로 "서버에서 세션이 끊어지는 구조"가 아닙니다.
+    - 이 프로젝트는 서버가 세션을 저장하지 않는 **stateless JWT 구조**이기 때문에,
+      "로그아웃"은 결국 **프론트가 토큰을 버리는 순간**에 이루어집니다.
+    - 이 엔드포인트는 그 전에 "토큰이 유효한 사용자가 로그아웃을 요청했다"는
+      체크 및 이벤트용이라고 이해하면 됩니다.
+    """
+
+    return {"message": "로그아웃 되었습니다. 클라이언트에서 토큰을 삭제해주세요."}

@@ -16,7 +16,8 @@ class UserProfileResponse(BaseModel):
     gender: str
     birthdate: date
     point: int
-
+    is_premium : bool   
+    
     class Config:
         from_attributes = True  
 
@@ -24,6 +25,10 @@ class UserProfileResponse(BaseModel):
 # 이름 수정 스키마
 class NameUpdateRequest(BaseModel):
     new_name: str
+
+
+class PremiumUpdateRequest(BaseModel):
+    is_premium: bool
 
 # 이름 수정 
 @router.put("/me/name", status_code=status.HTTP_200_OK)
@@ -52,3 +57,18 @@ async def delete_my_account(
     db.delete(current_user)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/me/premium", status_code=status.HTTP_200_OK)
+async def update_my_premium(
+    body: PremiumUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.is_premium = body.is_premium
+    db.commit()
+    db.refresh(current_user)
+    return {
+        "message": "프리미엄 상태가 변경되었습니다.",
+        "is_premium": current_user.is_premium,
+    }
