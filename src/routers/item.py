@@ -26,6 +26,9 @@ class ResponseEquipStatus(BaseModel):
     item_number: int
     message: str
 
+class ResponseUnequip(BaseModel):
+    message: str
+
 @router.post("/buy", response_model=ResponseAddPurchase)
 def buy_item(
     body: AddPurchaseInfo,
@@ -86,8 +89,8 @@ def buy_item(
    
 
 
-@router.post("/equip", response_model=ResponseEquipStatus)
-def buy_item(
+@router.patch("/equip", response_model=ResponseEquipStatus)
+def equip_item(
     body: EquipItem,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -104,7 +107,6 @@ def buy_item(
     ).first()
 
     
-    # 1. 기존에 작성한 메모를 수정한거라면 원래 튜플에서 memo_text만 수정
     if not isBought:
         raise HTTPException(
             status_code=403, 
@@ -121,4 +123,30 @@ def buy_item(
     return ResponseAddPurchase(
         item_number=ai_profile.equipped_item,
         message=f"{equipped.item_name} 아이템이 장착되었습니다."
+    )
+
+@router.patch("/unequip", response_model=ResponseUnequip)
+def unequip_item(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    응답 메시지: "아이템이 장착 해제되었습니다."
+    
+    """
+    
+    ai_profile = db.query(AiProfile).filter(AiProfile.owner_cognito_id == current_user.cognito_id).first()
+    if not ai_profile:
+        raise HTTPException(
+            status_code=404, 
+            detail="손주가 없습니다."
+        )
+    #예외 처리#
+
+    ai_profile.equipped_item = None
+    db.commit()
+    db.refresh(ai_profile)
+
+    return ResponseUnequip(
+        message="아이템이 장착 해제되었습니다."
     )

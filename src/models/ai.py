@@ -36,7 +36,7 @@ class AiProfile(Base):
     equipped_item: Mapped[int] = mapped_column(
         SMALLINT(unsigned=True),
         ForeignKey("item_list.item_number"),
-        default=1
+        nullable=True
     )
 
     user = relationship(

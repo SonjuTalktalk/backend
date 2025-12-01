@@ -6,7 +6,7 @@ from sqlalchemy.dialects.mysql import SMALLINT
 
 class ItemList(Base):
     __tablename__ = "item_list"
-    __table_args__ = {"mysql_engine": "InnoDB"} # item_number는 0부터 1씩 증가함
+    __table_args__ = {"mysql_engine": "InnoDB"}
     item_number: Mapped[int] = mapped_column(
         SMALLINT(unsigned=True),
         primary_key=True,
@@ -33,7 +33,7 @@ class ItemList(Base):
         back_populates="item_list",
     )
 
-    
+"""
 @event.listens_for(ItemList.__table__, "after_create")
 def insert_default_item(target, connection, **kw):
     connection.execute(
@@ -43,3 +43,4 @@ def insert_default_item(target, connection, **kw):
             item_price=0
         )
     )
+"""
