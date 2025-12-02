@@ -30,7 +30,10 @@ class NameUpdateRequest(BaseModel):
 class PremiumUpdateRequest(BaseModel):
     is_premium: bool
 
-# 이름 수정 
+class PointEarnRequest(BaseModel):
+    point: int
+      
+# 이름 수정
 @router.put("/me/name", status_code=status.HTTP_200_OK)
 async def update_my_name(
     body: NameUpdateRequest,
@@ -71,4 +74,37 @@ async def update_my_premium(
     return {
         "message": "프리미엄 상태가 변경되었습니다.",
         "is_premium": current_user.is_premium,
+    }
+    
+@router.post("/me/point/earn", status_code=status.HTTP_200_OK)
+async def earn_point(
+    body: PointEarnRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if body.point <= 0:
+        raise HTTPException(400, "amount는 양수여야 합니다.")
+    
+    # 여기서 따로 <= 0 체크 안 해도 됨 (conint가 막아줌)
+    current_user.point += body.point
+    db.commit()
+    db.refresh(current_user)
+    return {
+        "message": "포인트가 적립되었습니다.",
+        "point": current_user.point,
+    }
+    
+
+@router.post("/me/point/reset(test_ver)", status_code=status.HTTP_200_OK)
+async def reset_my_point(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    current_user.point = 0
+    db.commit()
+    db.refresh(current_user)
+    return {
+        "message": "포인트가 0으로 초기화되었습니다.",
+        "point": current_user.point,
     }
