@@ -59,8 +59,8 @@ class TodoMeta(BaseModel):
     has_todo: bool
     step: str  # "none" | "suggest" | "ask_confirm" | "ask_date" | "saved" | "cancelled"
     task: Optional[str] = None
-    date: Optional[str] = None  # 자연어 날짜 (예: "내일")
-    time: Optional[str] = None  # 자연어 시간 (예: "오전 10시")
+    date: Optional[str] = None  # LLM이 준 날짜 (가능하면 "YYYY-MM-DD")
+    time: Optional[str] = None  # LLM이 준 시간 (가능하면 "HH:MM")
     todo_num: Optional[int] = None  # 서버에서 생성한 todo_lists.todo_num
 
 
@@ -105,8 +105,12 @@ def _parse_korean_natural_datetime(
     TodoProcessor 가 넘겨준 한국어 날짜/시간(자연어)을
     실제 date / time 객체로 변환한다.
 
-    - date_text: "오늘", "내일", "모레", "11월 25일", "2025-11-25" 등
+    - date_text: "오늘", "내일", "모레", "다음주", "다음 주 수요일",
+                 "11월 25일", "2025-11-25" 등
     - time_text: "오전 10시", "오후 3시", "15:30" 등 (없을 수 있음)
+
+    LLM 이 이미 "YYYY-MM-DD", "HH:MM" 으로 정규화해 줬다면
+    그대로 파싱하고, 아니라면 간단한 자연어 규칙으로 처리한다.
     """
     from datetime import datetime as dt
     import re
@@ -121,13 +125,55 @@ def _parse_korean_natural_datetime(
     target_date = today
 
     if s_date:
+        # 공백 제거 버전 (예: "다음 주 수요일" → "다음주수요일")
+        normalized = s_date.replace(" ", "")
+
         # 1) 상대 표현
-        if s_date.startswith("오늘"):
+        if normalized.startswith("오늘"):
             target_date = today
-        elif s_date.startswith("내일"):
+
+        elif normalized.startswith("내일"):
             target_date = today + timedelta(days=1)
-        elif s_date.startswith("모레"):
+
+        elif normalized.startswith("모레"):
             target_date = today + timedelta(days=2)
+
+        # ✅ "다음주" / "다음 주 수요일" 등 처리
+        elif normalized.startswith("다음주"):
+            base_next_week = today + timedelta(weeks=1)
+            rest = normalized[len("다음주") :]  # "수요일", "수" 등 요일 부분
+
+            weekday_map = {
+                "월": 0, "월요일": 0,
+                "화": 1, "화요일": 1,
+                "수": 2, "수요일": 2,
+                "목": 3, "목요일": 3,
+                "금": 4, "금요일": 4,
+                "토": 5, "토요일": 5,
+                "일": 6, "일요일": 6,
+            }
+
+            if not rest:
+                # 그냥 "다음주"만 있을 때는
+                # 👉 오늘과 같은 요일의 다음 주
+                target_date = base_next_week
+            else:
+                # "다음주수요일" 같은 경우 요일을 찾아서
+                # 그 주의 해당 요일로 맞춰준다.
+                w = None
+                for key, idx in weekday_map.items():
+                    if key in rest:
+                        w = idx
+                        break
+
+                if w is None:
+                    # 요일을 못 찾으면 일단 오늘과 같은 요일의 다음 주
+                    target_date = base_next_week
+                else:
+                    # base_next_week 기준으로 그 주 월요일을 구한 뒤 + w일
+                    monday = base_next_week - timedelta(days=base_next_week.weekday())
+                    target_date = monday + timedelta(days=w)
+
         else:
             # 2) yyyy-mm-dd
             m = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", s_date)
@@ -150,8 +196,10 @@ def _parse_korean_natural_datetime(
     if not t_source:
         return target_date, None
 
+    import re as _re
+
     # 1) HH:MM
-    m = re.search(r"(\d{1,2}):(\d{2})", t_source)
+    m = _re.search(r"(\d{1,2}):(\d{2})", t_source)
     if m:
         h, mn = map(int, m.groups())
         return target_date, time_t(hour=h, minute=mn)
@@ -163,7 +211,7 @@ def _parse_korean_natural_datetime(
     elif any(x in t_source for x in ["오후", "저녁", "밤"]):
         ampm = "pm"
 
-    m2 = re.search(r"(\d{1,2})\s*시", t_source)
+    m2 = _re.search(r"(\d{1,2})\s*시", t_source)
     if m2:
         h = int(m2.group(1))
         if ampm == "am":
@@ -172,6 +220,7 @@ def _parse_korean_natural_datetime(
         elif ampm == "pm":
             if h < 12:
                 h += 12
+        # 오전/오후가 없으면 그대로 h시로 취급
         return target_date, time_t(hour=h, minute=0)
 
     # 시간 파싱 실패 → 날짜만 설정
@@ -229,7 +278,7 @@ def append_message_with_ai(
       - res.todo.step / res.todo.todo_num 에 따라:
         - "suggest":
             같은 말풍선 안에서 들여쓰기 등으로
-            "할일로 등록할까요?" 부분을 살짝 강조
+            "할일로 등록해 줄까?" 부분을 살짝 강조
         - "ask_confirm": 예/아니요 재질문
         - "ask_date": 날짜/시간 재질문
         - "saved" & has_todo=True:
