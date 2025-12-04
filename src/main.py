@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from src.routers import todo
-from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message, health, item
+from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message, health, item, background
 from src.db.database import engine, Base, SessionLocal
 
 import os
@@ -114,7 +114,7 @@ app.include_router(chat_message.router)
 app.include_router(todo.router)
 app.include_router(health.router)
 app.include_router(item.router)
-
+app.include_router(background.router)
 
 # 확인용 엔드포인트
 @app.get("/")

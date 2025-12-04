@@ -1,9 +1,9 @@
-from sqlalchemy import String, Date, UniqueConstraint, Integer, Boolean
+from sqlalchemy import String, Date, UniqueConstraint, Integer, Boolean, ForeignKey
 from datetime import date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.database import Base
 from typing import List, TYPE_CHECKING
-
+from sqlalchemy.dialects.mysql import SMALLINT
 
 if TYPE_CHECKING:
         from src.models.chat_history import ChatHistory
@@ -61,6 +61,12 @@ class User(Base):
         default=False
     )
     
+    equipped_background: Mapped[int] = mapped_column(
+        SMALLINT(unsigned=True),
+        ForeignKey("background_list.background_number", ondelete="CASCADE"),
+        nullable=True
+    )
+    
     ai_profile: Mapped["AiProfile"] = relationship(
         "AiProfile",
         back_populates="user",
@@ -112,6 +118,18 @@ class User(Base):
 
     item_buy_list = relationship(
         "ItemBuyList",
+        back_populates="users",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    background_list = relationship(
+        "BackgroundList",
+        back_populates="users",
+    )
+
+    background_buy_list = relationship(
+        "BackgroundBuyList",
         back_populates="users",
         cascade="all, delete-orphan",
         passive_deletes=True,

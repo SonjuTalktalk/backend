@@ -1,3 +1,4 @@
+# src/db/database.py
 #aws RDS MySQL 연결 설정
 import os                                                   
 from sqlalchemy import create_engine                        

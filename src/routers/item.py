@@ -47,7 +47,6 @@ def buy_item(
     ).first()
 
     
-    # 1. 기존에 작성한 메모를 수정한거라면 원래 튜플에서 memo_text만 수정
     if isBought:
         raise HTTPException(
             status_code=409, 
