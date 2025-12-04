@@ -19,6 +19,9 @@ from src.models.todo_list import ToDoList
 from sonju_ai.core.chat_service import ChatService
 from src.models.ai import AiProfile
 
+from sonju_ai.utils.openai_client import OpenAIClient
+
+
 router = APIRouter(prefix="/chats", tags=["채팅-메시지"])
 
 KST = ZoneInfo("Asia/Seoul")
@@ -30,8 +33,7 @@ KST = ZoneInfo("Asia/Seoul")
 class CreateMessageReq(BaseModel):
     message: str
     chat_list_num: Optional[int] = None  # 비우면 새 방 자동
-    enable_tts: bool = False  # AI 응답 TTS 생성 여부
-
+   
 
 class MessageItem(BaseModel):
     chat_list_num: int
@@ -67,6 +69,10 @@ class TodoMeta(BaseModel):
 class TurnResponse(BaseModel):
     ai: MessageItem
     todo: TodoMeta
+
+
+class TTSResponse(BaseModel):
+    tts_path: str
 
 
 # --------------------- ChatService 생성 ---------------------
@@ -340,7 +346,6 @@ def append_message_with_ai(
             user_id=uid,
             message=dangling_user.message,
             history=history,
-            enable_tts=req.enable_tts,
             chat_list_num=list_no,  # ✅ 방 번호까지 TodoProcessor 로 넘김
         )
         ai_text = ai_result["response"]
@@ -427,7 +432,6 @@ def append_message_with_ai(
         user_id=uid,
         message=req.message,
         history=history,
-        enable_tts=req.enable_tts,
         chat_list_num=list_no,  # ✅ 방 번호까지 TodoProcessor 로 넘김
     )
     ai_text = ai_result["response"]
@@ -513,3 +517,106 @@ def get_messages_of_room(
         )
         for r in rows
     ]
+
+@router.post("/messages/{chat_list_num}/{chat_num}/tts", response_model=TTSResponse, status_code=status.HTTP_200_OK)
+async def generate_tts_for_message(
+    chat_list_num: int,
+    chat_num: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    특정 채팅 메시지(보통 AI 말풍선)의 내용을 TTS(mp3)로 변환하고,
+       프론트에서 재생할 수 있는 mp3 경로를 내려주는 API 입니다.
+
+    ▶ 엔드포인트
+      POST /chats/messages/{chat_list_num}/{chat_num}/tts
+
+      예) 1번 방, 4번째 메시지의 음성을 듣고 싶을 때
+          POST /chats/messages/1/4/tts
+
+    ▶ 요청
+      - Path 파라미터:
+        - chat_list_num : 채팅방 번호 (int)
+        - chat_num      : 방 안에서의 메시지 번호 (int)
+      - Body:
+        - 특별히 넣을 값 없음 → {} (빈 JSON) 보내도 됨
+      - Header:
+        - Authorization: Bearer <JWT 토큰>
+        - Content-Type: application/json
+
+    ▶ 응답 (성공 시)
+      {
+        "tts_path": "/static/tts/tts_output_20251204_173530.mp3"
+      }
+
+      - 실제 재생 URL = API_BASE_URL + tts_path
+        예) API_BASE_URL = "http://10.0.2.2:8000" (안드로이드 에뮬레이터 기준)
+            tts_path     = "/static/tts/tts_output_20251204_173530.mp3"
+            → "http://10.0.2.2:8000/static/tts/tts_output_20251204_173530.mp3"
+
+    ▶ 동작 특징
+      - 같은 메시지에 대해 여러 번 호출해도 됨.
+      - 첫 호출:
+          DB에 TTS 경로가 없으면 → 새로 mp3 생성 → DB에 저장 → 그 경로 반환
+      - 두 번째 이후 호출:
+          DB에 이미 tts_path가 있으면 → mp3를 새로 만들지 않고 그 경로만 그대로 반환
+      - 프론트는 “첫 클릭인지 재클릭인지” 신경 쓸 필요 없음.
+    """
+
+
+    uid = current_user.cognito_id
+
+    # 1) 해당 채팅 메시지 찾기
+    row: ChatHistory | None = (
+        db.query(ChatHistory)
+        .filter(
+            ChatHistory.owner_cognito_id == uid,
+            ChatHistory.chat_list_num == chat_list_num,
+            ChatHistory.chat_num == chat_num,
+        )
+        .first()
+    )
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 채팅 메시지를 찾을 수 없습니다.",
+        )
+
+    # (선택) 짝수만 AI라고 강제하고 싶으면 이런 식으로 막을 수도 있음:
+    # if chat_num % 2 == 1:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_400_BAD_REQUEST,
+    #         detail="AI 메시지만 음성 변환이 가능합니다.",
+    #     )
+
+    # 2) 이미 TTS가 생성돼 있으면 그대로 재사용
+    if row.tts_path:
+        return TTSResponse(tts_path=row.tts_path)
+
+    # 3) 새로 TTS 생성
+    client = OpenAIClient()
+    disk_path = client.text_to_speech(row.message)
+
+    if disk_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="TTS 생성 중 오류가 발생했습니다.",
+        )
+
+    # 4) 디스크 경로를 URL 경로로 변환
+    #    예: "outputs/tts/xxx.mp3" -> "/static/tts/xxx.mp3"
+    #    (위에서 main.py에 app.mount("/static", StaticFiles(directory="outputs"), ...) 추가했기 때문에)
+    if disk_path.startswith("outputs"):
+        url_path = disk_path.replace("outputs", "/static", 1)
+    else:
+        # 혹시 다른 경로로 지정했을 경우를 대비한 방어코드
+        url_path = disk_path
+
+    # 5) DB에 저장 후 반환
+    row.tts_path = url_path
+    db.commit()
+    db.refresh(row)
+
+    return TTSResponse(tts_path=row.tts_path)

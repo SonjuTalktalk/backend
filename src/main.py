@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from zoneinfo import ZoneInfo
+from fastapi.staticfiles import StaticFiles
 
 from sqlalchemy import text
 
@@ -14,6 +15,8 @@ from src.db.database import engine, Base, SessionLocal
 import os
 import firebase_admin
 from firebase_admin import credentials
+
+from fastapi.staticfiles import StaticFiles
 
 # 테이블 생성 (알렘빅 쓰면 이 줄은 빼도 됨)
 Base.metadata.create_all(bind=engine)
@@ -85,8 +88,12 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
         print("스케줄러 종료됨")
 
+os.makedirs("outputs/tts", exist_ok=True)
 
 app = FastAPI(lifespan=lifespan)
+
+# 🔽 TTS 등 outputs 폴더 정적 서빙
+app.mount("/static", StaticFiles(directory="outputs"), name="static")
 
 # CORS 설정
 app.add_middleware(
@@ -99,7 +106,7 @@ app.add_middleware(
 
 # 라우터 등록
 app.include_router(auth.router)
-app.include_router(profile.router)
+app.include_router(profile.router)  
 app.include_router(ai_profile.router)
 app.include_router(challenge.router)
 app.include_router(chat_lists.router)
