@@ -1,12 +1,13 @@
 # src/routers/health.py
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from datetime import date, datetime, timedelta
 from src.auth.dependencies import get_current_user
 from src.db.database import get_db
 from src.models.users import User
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from sqlalchemy.exc import IntegrityError
 from src.models.health_memo import HealthMemo
 from src.models.health_medicine import HealthMedicine
 from src.services.medicine import create_medicine_routine
@@ -38,6 +39,39 @@ class ResponseHealthMedicine(BaseModel):
     medicine_daily: int
     medicine_period: int
     medicine_date: date
+
+class DeleteHealthMedicine(BaseModel):
+    medicine_name: str
+    medicine_date: date
+
+class ResponseDeleteMedicine(BaseModel):
+    response_message: str
+    medicine_name: str
+    medicine_date: date
+
+class ModifiedContents(BaseModel):
+    update_name: str | None = None
+    update_daily: int | None = None
+    update_period: int | None = None
+    update_date: date | None = None
+
+    @model_validator(mode="after")
+    def validate_at_least_one_field(self):
+        if not any([self.update_name, self.update_daily, self.update_period, self.update_date]):
+            raise ValueError("하나 이상의 필드가 필요합니다.")
+        return self
+    
+class PatchHealthMedicine(BaseModel):
+    current_name: str
+    current_date: date
+    update: ModifiedContents
+
+class ResponsePatchMedicine(BaseModel):
+    response_message: str
+    old_name: str
+    old_date: date
+    updated: ModifiedContents
+
 
 MAX_TEXT_BYTES = 65533
 
@@ -270,3 +304,124 @@ async def create_health_medicine_automatically(
         create_medicine_routine(db, item, current_user)
         for item in data
     ]
+
+@router.delete("/medicine", response_model=ResponseDeleteMedicine)
+def delete_health_medicine(
+    body: DeleteHealthMedicine,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    ## 응답 \n
+    { \n
+    "response_message": "복약 루틴이 삭제되었습니다.", \n
+    "medicine_name": "약이름", \n
+    "medicine_date": "2025-12-01" \n
+    } \n
+    """
+
+    routine = db.query(HealthMedicine).filter(
+        and_(
+            HealthMedicine.cognito_id == current_user.cognito_id,
+            HealthMedicine.medicine_name == body.medicine_name,
+            HealthMedicine.medicine_date == body.medicine_date
+        )
+    ).first()
+
+    if not routine:
+        raise HTTPException(
+            status_code=404, 
+            detail="등록되지 않은 복약 루틴입니다."
+        )
+
+    db.delete(routine)
+    db.commit()
+
+    return ResponseDeleteMedicine(
+            response_message = "복약 루틴이 삭제되었습니다.",
+            medicine_name = routine.medicine_name,
+            medicine_date = routine.medicine_date
+        )
+
+@router.patch("/medicine", response_model=ResponsePatchMedicine)
+def patch_health_medicine(
+    body: PatchHealthMedicine,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    ## 요청 \n
+    수정하고자 하는 복약 루틴의 정보와 (current_name과 current_date) \n
+    수정하고자 하는 정보를 update의 값 객체의 키 값으로 넣어서 보내기. \n
+    수정할 정보만 넣어주면 됨. 예를 들어 약 이름만 바꿀거면 "update" 에서 "update_name"만 부여 \n
+    최소 하나의 필드는 주어져야 함. 변경사항 유무를 클라이언트에서 체크 후에 변경한 필드가 있을 때에만 \n
+    형식에 맞춰서 엔드포인트에 요청 보내주세요. \n
+
+    ### ex) A라는 약 이름을 B로 변경 \n
+    { \n
+    "current_name": "A", \n
+    "current_date": "2025-12-13", \n
+    "update": { \n
+    "update_name": "B", \n
+    } \n
+    } \n
+
+    ---
+
+    ## 응답 \n
+    ### ex) \n
+    ### 2025년 12월 13일부터 약 C 복용을 시작하는 루틴을 \n
+    ### 2025년 12월 20일부터 약 D를 하루에 2번씩 3일 복용하는 루틴으로 \n
+    ### 수정에 성공했을 때
+    {
+    "response_message": "복약 루틴이 수정되었습니다.", \n
+    "old_name": "C", \n
+    "old_date": "2025-12-13", \n
+    "updated": { \n
+    "update_name": "D", \n
+    "update_daily": 2, \n
+    "update_period": 3, \n
+    "update_date": "2025-12-20" \n
+    } \n
+    } \n
+    """
+
+    routine = db.query(HealthMedicine).filter(
+        and_(
+            HealthMedicine.cognito_id == current_user.cognito_id,
+            HealthMedicine.medicine_name == body.current_name,
+            HealthMedicine.medicine_date == body.current_date
+        )
+    ).first()
+
+    if not routine:
+        raise HTTPException(
+            status_code=404, 
+            detail="등록되지 않은 복약 루틴입니다."
+        )
+
+    if body.update.update_name:
+        routine.medicine_name = body.update.update_name
+
+    if body.update.update_daily:
+        routine.medicine_daily = body.update.update_daily 
+
+    if body.update.update_period:
+        routine.medicine_period = body.update.update_period
+
+    if body.update.update_date:
+        routine.medicine_date = body.update.update_date
+
+    try:
+        db.commit()
+        db.refresh(routine)
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="이미 등록된 복약 루틴입니다. 약 이름과 투약 시작일이 동일한 경우 같은 루틴으로 취급합니다.")
+    
+    return ResponsePatchMedicine(
+        response_message = "복약 루틴이 수정되었습니다.",
+        old_name = body.current_name,
+        old_date = body.current_date,
+        updated = body.update
+    )
