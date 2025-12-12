@@ -400,24 +400,27 @@ def patch_health_medicine(
             detail="등록되지 않은 복약 루틴입니다."
         )
 
-    if body.update.update_name:
-        routine.medicine_name = body.update.update_name
+    update_fields = {
+        "update_name": "medicine_name",
+        "update_daily": "medicine_daily",
+        "update_period": "medicine_period",
+        "update_date": "medicine_date",
+    }
 
-    if body.update.update_daily:
-        routine.medicine_daily = body.update.update_daily 
-
-    if body.update.update_period:
-        routine.medicine_period = body.update.update_period
-
-    if body.update.update_date:
-        routine.medicine_date = body.update.update_date
+    for update_key, model_field in update_fields.items():
+        value = getattr(body.update, update_key)
+        if value is not None:
+            setattr(routine, model_field, value)
 
     try:
         db.commit()
         db.refresh(routine)
-    except IntegrityError as e:
+    except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="이미 등록된 복약 루틴입니다. 약 이름과 투약 시작일이 동일한 경우 같은 루틴으로 취급합니다.")
+        raise HTTPException(
+            status_code=409, 
+            detail="이미 등록된 복약 루틴입니다. 약 이름과 투약 시작일이 동일한 경우 같은 루틴으로 취급합니다."
+        )
     
     return ResponsePatchMedicine(
         response_message = "복약 루틴이 수정되었습니다.",
