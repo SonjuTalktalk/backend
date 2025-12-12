@@ -17,7 +17,10 @@ class ChatHistory(Base):
     chat_num: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    
     tts_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tts_voice: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
 
     chat_date: Mapped[date] = mapped_column(Date, nullable=False)
     chat_time: Mapped[time] = mapped_column(Time(timezone=False), nullable=False)

@@ -16,6 +16,20 @@ logger = logging.getLogger(__name__)
 # ✅ 모든 ChatService 인스턴스가 공유할 TodoProcessor (유저+방 단위 상태 유지)
 _SHARED_TODO_PROCESSOR = TodoProcessor()
 
+# 🆕 성격(model_type)별 TTS 음성 매핑
+# - AiProfile.personality 값(friendly/active/pleasant/reliable)과 키를 맞춤
+VOICE_MAPPING = {
+    "friendly": "nova",
+    "active": "shimmer",
+    "pleasant": "alloy",
+    "reliable": "onyx",
+}
+
+
+def resolve_tts_voice(model_type: str) -> str:
+    """model_type에 맞는 TTS voice 반환"""
+    return VOICE_MAPPING.get(model_type, "nova")
+
 
 class ChatService:
     """손주톡톡 메인 채팅 서비스 (4개 AI 모델 + 대화형 할일 추출 + TTS)"""
@@ -186,4 +200,5 @@ class ChatService:
         텍스트를 음성으로 변환하고, 저장된 경로를 반환한다.
         OpenAIClient.text_to_speech(...) 사용.
         """
-        return self.openai_client.text_to_speech(text)
+        voice = resolve_tts_voice(self.model_type)
+        return self.openai_client.text_to_speech(text, voice=voice)
