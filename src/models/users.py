@@ -4,16 +4,20 @@ from __future__ import annotations
 from datetime import date
 from typing import List, TYPE_CHECKING
 
-from sqlalchemy import String, Date, UniqueConstraint, Integer, Boolean, ForeignKey
+from sqlalchemy import String, Date, UniqueConstraint, Integer, Boolean, ForeignKey, Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.mysql import SMALLINT
 
 from src.db.database import Base
-
+import enum
 if TYPE_CHECKING:
     from src.models.chat_history import ChatHistory
     from src.models.ai import AiProfile
 
+class FontSize(str, enum.Enum):
+    small = "small"
+    medium = "medium"
+    large = "large"
 
 class User(Base):
     __tablename__ = "users"
@@ -68,6 +72,12 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
+    )
+
+    font_size: Mapped[FontSize] = mapped_column(
+        SqlEnum(FontSize, name="font_size"),
+        nullable=False,
+        default=FontSize.medium,
     )
 
     todo_lists = relationship(

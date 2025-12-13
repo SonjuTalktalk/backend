@@ -1,12 +1,12 @@
 # 프로필 관련 API 엔드포인트 (사용자 정보 조회)
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import date
 
 from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
 
-from src.models.users import User
+from src.models.users import User, FontSize
 from src.auth.dependencies import get_current_user
 from src.db.database import get_db
 from src.services.cognito_admin import admin_delete_user_by_sub
@@ -139,3 +139,14 @@ async def reset_my_point(
         "message": "포인트가 0으로 초기화되었습니다.",
         "point": current_user.point,
     }
+
+@router.patch("/me/fontsize")
+def update_font_size(
+    font_size: FontSize = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.font_size = font_size
+    db.commit()
+    db.refresh(current_user)
+    return f"글자 크기가 {current_user.font_size.value} 로 변경됐습니다."
