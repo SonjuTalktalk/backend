@@ -9,25 +9,18 @@ from src.models.users import User
 from src.models.ai import AiProfile
 from src.models.item_buy_list import ItemBuyList
 from src.models.item_list import ItemList
-
+from src.schemas.schema_item import (
+    AddPurchaseInfo,
+    ResponseAddPurchase,
+    EquipItem,
+    ResponseEquipStatus,
+    ResponseUnequip,
+    BoughtItem,
+    ResponseBought
+)
 router = APIRouter(prefix="/item", tags=["상점"])
 
-class AddPurchaseInfo(BaseModel):
-    item_number: int 
 
-class ResponseAddPurchase(BaseModel):
-    item_number: int
-    message: str
-
-class EquipItem(BaseModel):
-    item_number: int 
-
-class ResponseEquipStatus(BaseModel):
-    item_number: int
-    message: str
-
-class ResponseUnequip(BaseModel):
-    message: str
 
 @router.post("/buy", response_model=ResponseAddPurchase)
 def buy_item(
@@ -149,3 +142,45 @@ def unequip_item(
     return ResponseUnequip(
         message="아이템이 장착 해제되었습니다."
     )
+
+@router.get("/bought", response_model=ResponseBought)
+def list_bought_item(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    **응답** 
+    ### ex) \n
+    { \n
+    "result": [ \n
+    { \n
+      "item_number": 1, \n
+      "item_name": "ribbon" \n
+    }, \n
+    { \n
+      "item_number": 2, \n
+      "item_name": "hiking-hat" \n
+    }, \n
+    { \n
+      "item_number": 4, \n
+      "item_name": "wizard-hat" \n
+    } \n
+    ] \n
+    } \n
+    """
+
+    response = []
+
+    bought = db.query(ItemBuyList).join(ItemBuyList.item_list).filter(
+        ItemBuyList.cognito_id == current_user.cognito_id
+    ).all()
+
+    for item in bought:
+        response.append(
+            BoughtItem(
+                item_number = item.item_number,
+                item_name = item.item_list.item_name
+            )
+        )
+
+    return ResponseBought(result = response)
