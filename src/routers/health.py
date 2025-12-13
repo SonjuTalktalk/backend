@@ -1,76 +1,38 @@
 # src/routers/health.py
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from pydantic import BaseModel, model_validator
-from datetime import date, datetime, timedelta
+
+from datetime import date, timedelta
+
 from src.auth.dependencies import get_current_user
 from src.db.database import get_db
 from src.models.users import User
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
-from sqlalchemy.exc import IntegrityError
 from src.models.health_memo import HealthMemo
 from src.models.health_medicine import HealthMedicine
 from src.services.medicine import create_medicine_routine
+from src.schemas.schema_medicine import (
+    CreateHealthMemo, 
+    ResponseHealthMemo, 
+    RoutineHealthMedicine, 
+    CreateHealthMedicine,
+    ScannedHealthMedicine,
+    ResponseScannedMedicine,
+    ResponseHealthMedicine,
+    DeleteHealthMedicine,
+    ResponseDeleteMedicine,
+    ModifiedContents,
+    PatchHealthMedicine,
+    ResponsePatchMedicine
+)
+
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+from sqlalchemy.exc import IntegrityError
+
 from sonju_ai.core.health_service import HealthService
+
 import re
 
 router = APIRouter(prefix="/health", tags=["건강"])
-
-class CreateHealthMemo(BaseModel):
-    memo_date: date
-    memo_text: str
-
-class ResponseHealthMemo(BaseModel):
-    response_message: str
-    memo_text: str
-    memo_date: date
-    status: str
-
-class CreateHealthMedicine(BaseModel):
-    medicine_name: str
-    medicine_daily: int
-    medicine_period: int
-    medicine_date: date
-
-class ResponseHealthMedicine(BaseModel):
-    response_message: str
-    registered: bool
-    medicine_name: str
-    medicine_daily: int
-    medicine_period: int
-    medicine_date: date
-
-class DeleteHealthMedicine(BaseModel):
-    medicine_name: str
-    medicine_date: date
-
-class ResponseDeleteMedicine(BaseModel):
-    response_message: str
-    medicine_name: str
-    medicine_date: date
-
-class ModifiedContents(BaseModel):
-    update_name: str | None = None
-    update_daily: int | None = None
-    update_period: int | None = None
-    update_date: date | None = None
-
-    @model_validator(mode="after")
-    def validate_at_least_one_field(self):
-        if not any([self.update_name, self.update_daily, self.update_period, self.update_date]):
-            raise ValueError("하나 이상의 필드가 필요합니다.")
-        return self
-    
-class PatchHealthMedicine(BaseModel):
-    current_name: str
-    current_date: date
-    update: ModifiedContents
-
-class ResponsePatchMedicine(BaseModel):
-    response_message: str
-    old_name: str
-    old_date: date
-    updated: ModifiedContents
 
 
 MAX_TEXT_BYTES = 65533
@@ -244,11 +206,12 @@ def create_health_medicine(
     } \n
     """
     
-    return create_medicine_routine(db, body, current_user)
+    response = create_medicine_routine(db, body.target, current_user)
+    return ResponseHealthMedicine(response = response)
 
 
-@router.post("/automedicine")
-async def create_health_medicine_automatically(
+@router.post("/automedicine", response_model=ResponseScannedMedicine)
+async def scan_health_medicine(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -259,24 +222,31 @@ async def create_health_medicine_automatically(
     OCR을 통해 약 봉투 이미지 파일에서 필요한 내용 추출 \n
     ---
     ## 응답 \n
-    ### 1. 등록 성공 \n
+    ### ex) \n
     { \n
-    "response_message": "복약 루틴이 등록되었습니다.", \n
-    "registered": true, \n
-    "medicine_name": "약이름", \n
-    "medicine_daily": "3(하루 세 번)", \n
-    "medicine_period": "3(3일치)", \n
-    "medicine_date": "2025-12-01" \n
+    "result": [ \n
+    { \n
+    "medicine_name": "알부테롤", \n
+    "medicine_daily": 3, \n
+    "medicine_period": 6, \n
+    "medicine_date": "2020-02-07" \n
+    }, \n
+    { \n
+    "medicine_name": "슈가메트", \n
+    "medicine_daily": 3, \n
+    "medicine_period": 6, \n
+    "medicine_date": "2020-02-07" \n
+    }, \n
+     \n
+    ... \n
+     \n
+    { \n
+    "medicine_name": "소론도정", \n
+    "medicine_daily": 3, \n
+    "medicine_period": 6, \n
+    "medicine_date": "2020-02-07" \n
     } \n
-    
-    ### 2. 등록 실패 \n
-    { \n
-    "response_message": "이미 등록된 복약 루틴입니다. 약 이름과 투약 시작일이 동일한 경우 같은 루틴으로 취급합니다.", \n
-    "registered": false, \n
-    "medicine_name": "약이름", \n
-    "medicine_daily": "3(하루 세 번)", \n
-    "medicine_period": "3(3일치)", \n
-    "medicine_date": "2025-12-01" \n
+    ] \n
     } \n
 
     """
@@ -285,25 +255,19 @@ async def create_health_medicine_automatically(
 
     scanned_data = OCR.extract_prescription_info(content)
     
-    data = [
-    
-        CreateHealthMedicine(
+    result = [
+        ScannedHealthMedicine(
             medicine_name = routine["name"],
             medicine_daily = int(re.search(r"(\d+)회", routine["frequency"]).group(1)),
             medicine_period = routine["duration_days"],
             medicine_date = routine["prescription_date"]
         )
-
         for routine in scanned_data["medicines"]
     ]
-    
-    for a in data:
+    for a in result:
         print(a)
-        
-    return [
-        create_medicine_routine(db, item, current_user)
-        for item in data
-    ]
+
+    return ResponseScannedMedicine(result = result)
 
 @router.delete("/medicine", response_model=ResponseDeleteMedicine)
 def delete_health_medicine(
