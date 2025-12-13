@@ -160,7 +160,6 @@ def refresh_daily(
     current_user: User = Depends(get_current_user),
 ):
     """
-    ✅ 요구사항:
     refresh 하면 완료된 챌린지도 그냥 날아가고 새로운 걸로 바뀌게
     -> 오늘 picks 통째로 삭제 후 새로 4개 생성
     """
@@ -174,7 +173,7 @@ def refresh_daily(
     if int(state.refresh_used) >= PREMIUM_REFRESH_LIMIT:
         raise HTTPException(status_code=400, detail="오늘 새로고침 횟수를 모두 사용했습니다.")
 
-    # 🔥 완료 여부 상관없이 오늘 picks 전부 삭제
+    # 완료 여부 상관없이 오늘 picks 전부 삭제
     db.query(DailyChallengePick).filter(
         DailyChallengePick.owner_cognito_id == uid,
         DailyChallengePick.date_for == day,
