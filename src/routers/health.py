@@ -29,7 +29,7 @@ from sqlalchemy import and_
 from sqlalchemy.exc import IntegrityError
 
 from sonju_ai.core.health_service import HealthService
-
+from typing import List
 import re
 
 router = APIRouter(prefix="/health", tags=["건강"])
@@ -100,24 +100,45 @@ def create_health_memo(
         
     return response
    
-@router.get("/memos")
-def get_health_memo(
-    requested_date: date | None = Query(None),
-    requested_month: str | None = Query(None),
+@router.get("/memos/date", response_model=ResponseHealthMemo)
+def get_health_memo_by_date(
+    requested_date: date = Query(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    쿼리 파라미터 requested_date나 requested_month 필요함. \n
-    둘 다 들어올 수는 없음 (400 Bad Request로 처리) \n
-
-    ## 1. requested_date
-    ex) /health/memos?requested_date=2025-11-18 \n
+    쿼리 파라미터 requested_date 필요함. \n
+    
+    ex) /health/memos/date?requested_date=2025-11-18 \n
     **응답**
     1. 해당 날짜에 일지가 있는 경우: 일지 텍스트 반환
     2. 해당 날짜에 일지가 없는 경우: 빈 문자열('') 반환
+    """
+    
+    memo = db.query(HealthMemo).filter(
+        and_(
+            HealthMemo.cognito_id == current_user.cognito_id,
+            HealthMemo.memo_date == requested_date
+        )
+    ).first()
+    response = ResponseHealthMemo(
+        response_message = f"{requested_date}에 작성한 건강 일지입니다." if memo else "해당 날짜에 작성한 건강 일지가 없습니다.",
+        memo_text = memo.memo_text if memo else "",
+        memo_date = requested_date,
+        status = memo.status if memo else ""
+    )
 
-    ## 2. requested_month
+    return response
+
+@router.get("/memos/month", response_model=List[ResponseHealthMemo])
+def get_health_memo_by_month(
+    requested_month: str = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    쿼리 파라미터 requested_month 필요함. \n
+    
     ex) /health/memos?requested_month=2025-11 \n
     **응답** \n
     해당 월에 작성한 모든 일지를 반환
@@ -125,58 +146,31 @@ def get_health_memo(
     
     """
 
-    if requested_date and requested_month:
-        raise HTTPException(
-            status_code=400, 
-            detail="requested_date와 requested_month 중 하나만 파리미터로 받을 수 있습니다."
+    year, month = map(int, requested_month.split("-"))
+    start_date = date(year, month, 1)
+    end_date = date(year, month, 28) + timedelta(days=4)
+    end_date = end_date.replace(day=1)
+
+    memos = db.query(HealthMemo).filter(
+        and_(
+            HealthMemo.cognito_id == current_user.cognito_id,
+            HealthMemo.memo_date >= start_date,
+            HealthMemo.memo_date < end_date
         )
+    ).all()
 
-    if not requested_date and not requested_month:
-        raise HTTPException(
-            status_code=400, 
-            detail="쿼리 파라미터가 없습니다."
+    response = [
+        ResponseHealthMemo(
+            response_message = f"{memo.memo_date}에 작성한 건강 일지입니다.",
+            memo_text = memo.memo_text,
+            memo_date = memo.memo_date,
+            status = memo.status
         )
-
-    if requested_date:
-        memo = db.query(HealthMemo).filter(
-            and_(
-                HealthMemo.cognito_id == current_user.cognito_id,
-                HealthMemo.memo_date == requested_date
-            )
-        ).first()
-        response = ResponseHealthMemo(
-            response_message = f"{requested_date}에 작성한 건강 일지입니다." if memo else "해당 날짜에 작성한 건강 일지가 없습니다.",
-            memo_text = memo.memo_text if memo else "",
-            memo_date = requested_date,
-            status = memo.status if memo else ""
-        )
-
-    else:
-        year, month = map(int, requested_month.split("-"))
-        start_date = date(year, month, 1)
-        end_date = date(year, month, 28) + timedelta(days=4)
-        end_date = end_date.replace(day=1)
-
-        memos = db.query(HealthMemo).filter(
-            and_(
-                HealthMemo.cognito_id == current_user.cognito_id,
-                HealthMemo.memo_date >= start_date,
-                HealthMemo.memo_date < end_date
-            )
-        ).all()
-
-        response = [
-            ResponseHealthMemo(
-                response_message = f"{memo.memo_date}에 작성한 건강 일지입니다.",
-                memo_text = memo.memo_text,
-                memo_date = memo.memo_date,
-                status = memo.status
-            )
-            for memo in memos
-        ]
+        for memo in memos
+    ]
 
     return response
-    
+
 @router.post("/medicine", response_model=ResponseHealthMedicine)
 def create_health_medicine(
     body: CreateHealthMedicine,
