@@ -23,14 +23,11 @@ class BackgroundList(Base):
         nullable=False
     )
 
-    users = relationship(
-        "User", 
-        back_populates="background_list",
-    )
-
     background_buy_list = relationship(
         "BackgroundBuyList",
         back_populates="background_list",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 """

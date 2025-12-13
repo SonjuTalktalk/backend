@@ -1,17 +1,21 @@
-from sqlalchemy import String, Date, UniqueConstraint, Integer, Boolean, ForeignKey
+# src/models/users.py
+from __future__ import annotations
+
 from datetime import date
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from src.db.database import Base
 from typing import List, TYPE_CHECKING
+
+from sqlalchemy import String, Date, UniqueConstraint, Integer, Boolean, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.mysql import SMALLINT
 
+from src.db.database import Base
+
 if TYPE_CHECKING:
-        from src.models.chat_history import ChatHistory
-        from src.models.ai import AiProfile
-        from src.models.notification import Notification 
-        
+    from src.models.chat_history import ChatHistory
+    from src.models.ai import AiProfile
+
+
 class User(Base):
-    
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("cognito_id", name="uq_users_cognito_id"),
@@ -23,80 +27,54 @@ class User(Base):
         primary_key=True,
         nullable=False,
         unique=True,
-        index=True
+        index=True,
     )
 
-   
     phone_number: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
         unique=True,
-        index=True
+        index=True,
     )
 
-    # 이름/성별/생일
-    name: Mapped[str] = mapped_column(
-        String(120),
-        nullable=False
-    )
-    
-    gender: Mapped[str] = mapped_column(
-        String(10), 
-        nullable=False
-    )
-    
-    birthdate: Mapped[date] = mapped_column(
-        Date, 
-        nullable=False
-    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
 
-    point: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        default=0
-    )
-    
-    is_premium : Mapped[Boolean] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False
-    )
-    
-    equipped_background: Mapped[int] = mapped_column(
+    gender: Mapped[str] = mapped_column(String(10), nullable=False)
+
+    birthdate: Mapped[date] = mapped_column(Date, nullable=False)
+
+    point: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    is_premium: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # ✅ 배경 장착 저장 (background.py에서 사용 중)
+    equipped_background: Mapped[int | None] = mapped_column(
         SMALLINT(unsigned=True),
-        ForeignKey("background_list.background_number", ondelete="CASCADE"),
-        nullable=True
+        ForeignKey("background_list.background_number", ondelete="SET NULL"),
+        nullable=True,
+        default=None,
     )
-    
+
     ai_profile: Mapped["AiProfile"] = relationship(
         "AiProfile",
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        uselist=False,               
+        uselist=False,
     )
-
 
     chat_histories: Mapped[List["ChatHistory"]] = relationship(
         "ChatHistory",
         back_populates="user",
         cascade="all, delete-orphan",
-        passive_deletes=True
-    )
-    
-    notifications: Mapped[List["Notification"]] = relationship(
-        "Notification",
-        back_populates="user",
-        cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    
-  
+
     todo_lists = relationship(
         "ToDoList",
         back_populates="user",
         cascade="all, delete-orphan",
-        passive_deletes=True,      # ondelete=CASCADE 신뢰
+        passive_deletes=True,
     )
 
     health_memos = relationship(
@@ -112,17 +90,20 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    
+
     daily_challenges = relationship(
         "DailyChallengePick",
         back_populates="owner",
         cascade="all, delete-orphan",
-        passive_deletes=True,  
+        passive_deletes=True,
     )
 
+    # ✅ 여기 cascade 없으면 삭제할 때 꼬일 수 있음(너가 봤던 AssertionError 계열)
     daily_challenge_states = relationship(
         "DailyChallengeUserState",
         back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     item_buy_list = relationship(
@@ -132,21 +113,18 @@ class User(Base):
         passive_deletes=True,
     )
 
-    background_list = relationship(
-        "BackgroundList",
-        back_populates="users",
-    )
-
+    # ✅ BackgroundBuyList.users(back_populates="background_buy_list")를 만족시켜야 함
     background_buy_list = relationship(
         "BackgroundBuyList",
         back_populates="users",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    
+
+    # ✅ Notification.user(back_populates="notifications")를 만족시켜야 함
     notifications = relationship(
-    "Notification",
-    back_populates="user",
-    cascade="all, delete-orphan",
-    passive_deletes=True,
-)
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

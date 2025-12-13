@@ -25,12 +25,11 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # ✅ 네가 정한 변수명 그대로
+    # 네가 정한 변수명 그대로
     noti_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     noti_time: Mapped[dt.time] = mapped_column(Time(timezone=False), nullable=False)
 
     __table_args__ = (
-        # ✅ 여기 중요: "date","time"이 아니라 "noti_date","noti_time"로 맞춰야 함
         Index(
             "idx_notifications_owner_date_time",
             "owner_cognito_id",
