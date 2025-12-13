@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.database import Base
@@ -20,8 +20,8 @@ class Challenges(Base):
 class DailyChallengePick(Base):
     """
     유저별 오늘의 챌린지 4개
-    - slot_index 제거 버전
     - (owner_cognito_id, date_for, challenge_id) 복합 PK
+    - ✅ 완료 체크는 is_complete로만 관리
     """
     __tablename__ = "daily_challenge_picks"
 
@@ -31,11 +31,13 @@ class DailyChallengePick(Base):
     )
     date_for: Mapped[date] = mapped_column(Date, primary_key=True)
 
-    # 🔥 slot_index 대신 challenge_id를 PK에 포함
     challenge_id: Mapped[int] = mapped_column(
         ForeignKey("challenges.id", ondelete="CASCADE"),
         primary_key=True,
     )
+
+    # ✅ 추가: 완료 여부
+    is_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     challenge: Mapped["Challenges"] = relationship("Challenges")
 
