@@ -21,7 +21,8 @@ from src.schemas.schema_medicine import (
     ResponseDeleteMedicine,
     ModifiedContents,
     PatchHealthMedicine,
-    ResponsePatchMedicine
+    ResponsePatchMedicine,
+    ResponseGetMedicine
 )
 
 from sqlalchemy.orm import Session
@@ -203,6 +204,42 @@ def create_health_medicine(
     response = create_medicine_routine(db, body.target, current_user)
     return ResponseHealthMedicine(response = response)
 
+@router.get("/medicine", response_model=ResponseGetMedicine)
+def get_health_medicine(
+    requested_date: date = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    쿼리 파라미터 requested_date 필요함. \n
+    ex) /health/medicine?requested_date=2025-12-13 \n
+    **응답** \n
+    해당 날짜에 수행해야 하는 복약 루틴을 반환 \n
+    \n
+    """
+    response = []
+    search_start_date = requested_date - timedelta(days=30)
+    candidates = db.query(HealthMedicine).filter(
+        and_(
+            HealthMedicine.cognito_id == current_user.cognito_id,
+            HealthMedicine.medicine_date.between(search_start_date, requested_date),
+        )
+    ).all()
+    for routine in candidates:
+        if (
+            routine.medicine_date 
+            <= requested_date 
+            <= routine.medicine_date + timedelta(days=routine.medicine_period - 1)
+        ):
+            response.append(
+                RoutineHealthMedicine(
+                    medicine_name = routine.medicine_name,
+                    medicine_daily = routine.medicine_daily,
+                    medicine_period = routine.medicine_period,
+                    medicine_date = routine.medicine_date
+                )
+            )
+    return ResponseGetMedicine(result = response)
 
 @router.post("/automedicine", response_model=ResponseScannedMedicine)
 async def scan_health_medicine(

@@ -20,6 +20,9 @@ class RoutineHealthMedicine(BaseModel):
 class CreateHealthMedicine(BaseModel):
     target: List[RoutineHealthMedicine]
 
+class ResponseGetMedicine(BaseModel):
+    result: List[RoutineHealthMedicine]
+
 class ScannedHealthMedicine(BaseModel):
     medicine_name: str
     medicine_daily: int
