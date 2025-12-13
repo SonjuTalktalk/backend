@@ -570,7 +570,7 @@ async def generate_tts_for_message(
 
   2) 두 번째 이후 호출 (캐시 히트)
      - DB에 tts_path가 있고,
-     - DB의 tts_voice == 현재 voice
+     - DB의 tts_voice == 현재 voice 
        → mp3를 새로 만들지 않고 기존 경로(tts_path) 그대로 반환
 
   - 결론: 프론트는 "TTS 버튼 누를 때마다 이 API 호출 → 응답의 tts_path 재생"만 하면 됩니다.

@@ -8,6 +8,7 @@ from sqlalchemy.dialects.mysql import SMALLINT
 if TYPE_CHECKING:
         from src.models.chat_history import ChatHistory
         from src.models.ai import AiProfile
+        from src.models.notification import Notification 
         
 class User(Base):
     
@@ -75,11 +76,19 @@ class User(Base):
         uselist=False,               
     )
 
+
     chat_histories: Mapped[List["ChatHistory"]] = relationship(
         "ChatHistory",
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True
+    )
+    
+    notifications: Mapped[List["Notification"]] = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     
   
@@ -134,3 +143,10 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    
+    notifications = relationship(
+    "Notification",
+    back_populates="user",
+    cascade="all, delete-orphan",
+    passive_deletes=True,
+)

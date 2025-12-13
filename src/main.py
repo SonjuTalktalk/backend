@@ -1,3 +1,5 @@
+import datetime as dt
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -11,12 +13,11 @@ from sqlalchemy import text
 from src.routers import todo
 from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message, health, item, background
 from src.db.database import engine, Base, SessionLocal
+from src.routers import notifications
 
 import os
 import firebase_admin
 from firebase_admin import credentials
-
-from fastapi.staticfiles import StaticFiles
 
 # 테이블 생성 (알렘빅 쓰면 이 줄은 빼도 됨)
 Base.metadata.create_all(bind=engine)
@@ -24,14 +25,14 @@ Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    
+
     key_path = "firebase-key.json"  # backend 폴더 바로 아래에 있어야 합니다.
 
     # 1. 파일 존재 여부 확인 (안전장치)
     if os.path.exists(key_path):
         # 키 파일이 있으면 연결 시도
         cred = credentials.Certificate(key_path)
-        
+
         # 2. 이미 연결된 상태인지 확인 (FastAPI 재시작 시 에러 방지)
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
@@ -42,12 +43,12 @@ async def lifespan(app: FastAPI):
         # 키 파일이 없으면 경고만 출력 (서버 다운 방지)
         print(f"⚠️ [경고] '{key_path}' 파일을 찾을 수 없습니다.")
         print("👉 로컬 개발 시 루트 폴더에 키 파일을 넣어주세요. (알림 기능 제한됨)")
-        
-        
+
     """
     - 앱 시작 시 스케줄러 등록
     - 매일 00:00 KST마다 '어제 이전 daily 기록' 삭제
       (daily_challenge_picks, daily_challenge_user_states)
+    - 매일 00:00 KST마다 '3일 지난 notifications' 삭제
     - 앱 종료 시 스케줄러 종료
     """
     scheduler = AsyncIOScheduler(timezone=ZoneInfo("Asia/Seoul"))
@@ -56,8 +57,6 @@ async def lifespan(app: FastAPI):
         db = SessionLocal()
         try:
             # 🔹 하루 지난 daily 기록 삭제
-            #   - date_for < CURDATE() 인 것들 전부 삭제
-            #   - 오늘(예: 2025-11-27) 기준, 26일 이전 데이터 다 날림
             db.execute(text("""
                 DELETE FROM daily_challenge_picks
                 WHERE date_for < CURDATE()
@@ -68,9 +67,28 @@ async def lifespan(app: FastAPI):
                 WHERE date_for < CURDATE()
             """))
 
+            # ✅ 🔔 3일 지난 알림 삭제 (noti_date, noti_time 기준)
+            #    (KST 기준으로 계산하되, DB에는 tz 없는 date/time 저장이라 tzinfo 제거)
+            now_kst = dt.datetime.now(ZoneInfo("Asia/Seoul")).replace(tzinfo=None, microsecond=0)
+            cutoff = now_kst - dt.timedelta(days=3)
+
+            db.execute(
+                text("""
+                    DELETE FROM notifications
+                    WHERE (noti_date < :cutoff_date)
+                       OR (noti_date = :cutoff_date AND noti_time < :cutoff_time)
+                """),
+                {
+                    "cutoff_date": cutoff.date(),
+                    "cutoff_time": cutoff.time(),
+                }
+            )
+
             db.commit()
-            print("[스케줄러] 오래된 daily 기록 정리 완료")
+            print("[스케줄러] 오래된 daily 기록 + 오래된 notifications 정리 완료")
+
         except Exception as e:
+            db.rollback()
             print(f"[스케줄러 오류] {e}")
         finally:
             db.close()
@@ -87,6 +105,7 @@ async def lifespan(app: FastAPI):
     finally:
         scheduler.shutdown(wait=False)
         print("스케줄러 종료됨")
+
 
 os.makedirs("outputs/tts", exist_ok=True)
 
@@ -106,7 +125,7 @@ app.add_middleware(
 
 # 라우터 등록
 app.include_router(auth.router)
-app.include_router(profile.router)  
+app.include_router(profile.router)
 app.include_router(ai_profile.router)
 app.include_router(challenge.router)
 app.include_router(chat_lists.router)
@@ -115,6 +134,7 @@ app.include_router(todo.router)
 app.include_router(health.router)
 app.include_router(item.router)
 app.include_router(background.router)
+app.include_router(notifications.router)
 
 # 확인용 엔드포인트
 @app.get("/")
