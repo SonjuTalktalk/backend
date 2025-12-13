@@ -142,10 +142,19 @@ async def reset_my_point(
 
 @router.patch("/me/fontsize")
 def update_font_size(
-    font_size: FontSize = Query(...),
+    size: FontSize = Query(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """
+    쿼리 파라미터 size(small, medium, large) 필요함. \n
+    
+    ex) /profile/me/fontsize?size=large \n
+
+    **응답**
+    ### ex) \n
+    "글자 크기가 large 로 변경됐습니다."
+    """
     current_user.font_size = font_size
     db.commit()
     db.refresh(current_user)
