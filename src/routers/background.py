@@ -8,25 +8,18 @@ from src.db.database import get_db
 from src.models.users import User
 from src.models.background_buy_list import BackgroundBuyList
 from src.models.background_list import BackgroundList
+from src.schemas.schema_background import (
+    AddPurchaseInfo,
+    ResponseAddPurchase,
+    EquipBackground,
+    ResponseEquipStatus,
+    ResponseUnequip,
+    BoughtBackground,
+    ResponseBought
+)
 
 router = APIRouter(prefix="/background", tags=["배경"])
 
-class AddPurchaseInfo(BaseModel):
-    background_number: int 
-
-class ResponseAddPurchase(BaseModel):
-    background_number: int
-    message: str
-
-class EquipBackground(BaseModel):
-    background_number: int 
-
-class ResponseEquipStatus(BaseModel):
-    background_number: int
-    message: str
-
-class ResponseUnequip(BaseModel):
-    message: str
 
 @router.post("/buy", response_model=ResponseAddPurchase)
 def buy_background(
@@ -138,3 +131,45 @@ def unequip_background(
     return ResponseUnequip(
         message="배경이 장착 해제되었습니다."
     )
+
+@router.get("/bought", response_model=ResponseBought)
+def list_bought_background(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    **응답** 
+    ### ex) \n
+    { \n
+    "result": [ \n
+    { \n
+      "background_number": 1, \n
+      "background_name": "ribbon" \n
+    }, \n
+    { \n
+      "background_number": 2, \n
+      "background_name": "hiking-hat" \n
+    }, \n
+    { \n
+      "background_number": 4, \n
+      "background_name": "wizard-hat" \n
+    } \n
+    ] \n
+    } \n
+    """
+
+    response = []
+
+    bought = db.query(BackgroundBuyList).join(BackgroundBuyList.background_list).filter(
+        BackgroundBuyList.cognito_id == current_user.cognito_id
+    ).all()
+
+    for background in bought:
+        response.append(
+            BoughtBackground(
+                background_number = background.background_number,
+                background_name = background.background_list.background_name
+            )
+        )
+
+    return ResponseBought(result = response)

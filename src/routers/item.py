@@ -18,8 +18,8 @@ from src.schemas.schema_item import (
     BoughtItem,
     ResponseBought
 )
-router = APIRouter(prefix="/item", tags=["상점"])
 
+router = APIRouter(prefix="/item", tags=["상점"])
 
 
 @router.post("/buy", response_model=ResponseAddPurchase)
