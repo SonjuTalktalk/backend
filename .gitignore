@@ -22,3 +22,6 @@ venv/
 firebase-key.json
 
 outputs/    
+
+access_token.py
+accesstoken.py
