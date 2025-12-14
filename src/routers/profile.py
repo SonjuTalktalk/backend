@@ -155,7 +155,7 @@ def update_font_size(
     ### ex) \n
     "글자 크기가 large 로 변경됐습니다."
     """
-    current_user.font_size = font_size
+    current_user.font_size = size
     db.commit()
     db.refresh(current_user)
     return f"글자 크기가 {current_user.font_size.value} 로 변경됐습니다."
