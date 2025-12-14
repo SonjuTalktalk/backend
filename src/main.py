@@ -14,6 +14,7 @@ from src.routers import todo
 from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_message, health, item, background
 from src.db.database import engine, Base, SessionLocal
 from src.routers import notifications
+from src.routers.kakaopay import router as kakaopay_router
 
 # ✅ 추가: FCM 토큰 라우터
 from src.routers import fcm
@@ -169,6 +170,7 @@ app.include_router(health.router)
 app.include_router(item.router)
 app.include_router(background.router)
 app.include_router(notifications.router)
+app.include_router(kakaopay_router)
 
 # ✅ 추가: FCM 토큰 등록/해제 라우터
 app.include_router(fcm.router)
