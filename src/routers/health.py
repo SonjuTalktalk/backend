@@ -221,25 +221,24 @@ def get_health_medicine(
     \n
     """
     response = []
-    search_start_date = requested_date - timedelta(days=30)
+    
     candidates = db.query(HealthMedicine).filter(
-        and_(
-            HealthMedicine.cognito_id == current_user.cognito_id,
-            HealthMedicine.medicine_date.between(search_start_date, requested_date),
-        )
+        HealthMedicine.cognito_id == current_user.cognito_id,  
     ).all()
+
     for routine in candidates:
         if (
-            routine.medicine_date 
+            routine.medicine_start_date 
             <= requested_date 
-            <= routine.medicine_date + timedelta(days=routine.medicine_period - 1)
+            <= routine.medicine_end_date
         ):
             response.append(
-                RoutineHealthMedicine(
+                GetRoutineHealthMedicine(
                     medicine_name = routine.medicine_name,
                     medicine_daily = routine.medicine_daily,
                     medicine_period = routine.medicine_period,
-                    medicine_date = routine.medicine_date
+                    medicine_start_date = routine.medicine_start_date,
+                    medicine_end_date = routine.medicine_end_date
                 )
             )
     return ResponseGetMedicine(result = response)
@@ -263,13 +262,13 @@ async def scan_health_medicine(
     "medicine_name": "알부테롤", \n
     "medicine_daily": 3, \n
     "medicine_period": 6, \n
-    "medicine_date": "2020-02-07" \n
+    "medicine_start_date": "2020-02-07" \n
     }, \n
     { \n
     "medicine_name": "슈가메트", \n
     "medicine_daily": 3, \n
     "medicine_period": 6, \n
-    "medicine_date": "2020-02-07" \n
+    "medicine_start_date": "2020-02-07" \n
     }, \n
      \n
     ... \n
@@ -278,7 +277,7 @@ async def scan_health_medicine(
     "medicine_name": "소론도정", \n
     "medicine_daily": 3, \n
     "medicine_period": 6, \n
-    "medicine_date": "2020-02-07" \n
+    "medicine_start_date": "2020-02-07" \n
     } \n
     ] \n
     } \n
@@ -294,7 +293,7 @@ async def scan_health_medicine(
             medicine_name = routine["name"],
             medicine_daily = int(re.search(r"(\d+)회", routine["frequency"]).group(1)),
             medicine_period = routine["duration_days"],
-            medicine_date = routine["prescription_date"]
+            medicine_start_date = routine["prescription_date"]
         )
         for routine in scanned_data["medicines"]
     ]
@@ -314,7 +313,7 @@ def delete_health_medicine(
     { \n
     "response_message": "복약 루틴이 삭제되었습니다.", \n
     "medicine_name": "약이름", \n
-    "medicine_date": "2025-12-01" \n
+    "medicine_start_date": "2025-12-01" \n
     } \n
     """
 
@@ -322,7 +321,7 @@ def delete_health_medicine(
         and_(
             HealthMedicine.cognito_id == current_user.cognito_id,
             HealthMedicine.medicine_name == body.medicine_name,
-            HealthMedicine.medicine_date == body.medicine_date
+            HealthMedicine.medicine_start_date == body.medicine_start_date
         )
     ).first()
 
@@ -338,7 +337,7 @@ def delete_health_medicine(
     return ResponseDeleteMedicine(
             response_message = "복약 루틴이 삭제되었습니다.",
             medicine_name = routine.medicine_name,
-            medicine_date = routine.medicine_date
+            medicine_start_date = routine.medicine_start_date
         )
 
 @router.patch("/medicine", response_model=ResponsePatchMedicine)
@@ -349,7 +348,7 @@ def patch_health_medicine(
 ):
     """
     ## 요청 \n
-    수정하고자 하는 복약 루틴의 정보와 (current_name과 current_date) \n
+    수정하고자 하는 복약 루틴의 정보와 (medicine_name과 medicine_start_date) \n
     수정하고자 하는 정보를 update의 값 객체의 키 값으로 넣어서 보내기. \n
     수정할 정보만 넣어주면 됨. 예를 들어 약 이름만 바꿀거면 "update" 에서 "update_name"만 부여 \n
     최소 하나의 필드는 주어져야 함. 변경사항 유무를 클라이언트에서 체크 후에 변경한 필드가 있을 때에만 \n
@@ -357,8 +356,8 @@ def patch_health_medicine(
 
     ### ex) A라는 약 이름을 B로 변경 \n
     { \n
-    "current_name": "A", \n
-    "current_date": "2025-12-13", \n
+    "medicine_name": "A", \n
+    "medicine_start_date": "2025-12-13", \n
     "update": { \n
     "update_name": "B", \n
     } \n
@@ -384,31 +383,58 @@ def patch_health_medicine(
     } \n
     """
 
+    
     routine = db.query(HealthMedicine).filter(
         and_(
             HealthMedicine.cognito_id == current_user.cognito_id,
-            HealthMedicine.medicine_name == body.current_name,
-            HealthMedicine.medicine_date == body.current_date
+            HealthMedicine.medicine_name == body.medicine_name,
+            HealthMedicine.medicine_start_date == body.medicine_start_date
         )
     ).first()
+
+    
 
     if not routine:
         raise HTTPException(
             status_code=404, 
             detail="등록되지 않은 복약 루틴입니다."
         )
+    
+    old_routine = HealthMedicine(
+        cognito_id=routine.cognito_id,
+        medicine_name=routine.medicine_name,
+        medicine_daily=routine.medicine_daily,
+        medicine_period=routine.medicine_period,
+        medicine_start_date = routine.medicine_start_date,
+        medicine_end_date = routine.medicine_end_date
+    )
 
     update_fields = {
         "update_name": "medicine_name",
         "update_daily": "medicine_daily",
         "update_period": "medicine_period",
-        "update_date": "medicine_date",
+        "update_date": "medicine_start_date",
     }
 
     for update_key, model_field in update_fields.items():
         value = getattr(body.update, update_key)
         if value is not None:
             setattr(routine, model_field, value)
+            
+    routine.medicine_end_date = routine.medicine_start_date + timedelta(days=routine.medicine_period - 1)
+
+    if (
+        old_routine.medicine_name == routine.medicine_name and
+        old_routine.medicine_daily == routine.medicine_daily and
+        old_routine.medicine_period == routine.medicine_period and
+        old_routine.medicine_start_date == routine.medicine_start_date
+    ):
+        return ResponsePatchMedicine(
+            response_message = "수정할 사항이 없습니다.",
+            old_name = body.medicine_name,
+            old_date = body.medicine_start_date,
+            updated = body.update
+        )
 
     try:
         db.commit()
@@ -422,7 +448,7 @@ def patch_health_medicine(
     
     return ResponsePatchMedicine(
         response_message = "복약 루틴이 수정되었습니다.",
-        old_name = body.current_name,
-        old_date = body.current_date,
+        old_name = body.medicine_name,
+        old_date = body.medicine_start_date,
         updated = body.update
     )
