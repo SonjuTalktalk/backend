@@ -31,7 +31,10 @@ from firebase_admin import credentials
 # (create_all은 "테이블 생성"만 하고 기존 테이블 컬럼 추가는 못함)
 import src.models.fcm_token  # noqa: F401
 
-Base.metadata.create_all(bind=engine) # <- 이거 지우지 마세요 SQLAlchemy로 정의한 DB 테이블 DBMS에서 생성해주는 코드입니다
+import logging
+
+logging.basicConfig( level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s" )
+Base.metadata.create_all(bind=engine) # <- 이거 지우지 마세요 SQLAlchemy로 정의한 DB 테이블 DBMS에 생성해주는 코드입니다
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,8 +50,10 @@ async def lifespan(app: FastAPI):
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
             print("✅ [성공] Firebase(FCM) 서버와 연결되었습니다!")
+            logging.info("✅ [성공] Firebase(FCM) 서버와 연결되었습니다!")
         else:
             print("ℹ️ [정보] Firebase가 이미 실행 중입니다.")
+            logging.info("ℹ️ [정보] Firebase가 이미 실행 중입니다. \n")
     else:
         # 키 파일이 없으면 경고만 출력 (서버 다운 방지)
         print(f"⚠️ [경고] '{key_path}' 파일을 찾을 수 없습니다.")
