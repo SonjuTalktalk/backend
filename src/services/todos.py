@@ -50,6 +50,8 @@ def create_todo_compact(
     '빈 번호 메우기' 전략으로 todo_num을 부여해 생성.
     동시성으로 유니크 충돌이 나면 번호를 다시 계산해 재시도.
     (복합 PK이므로 유니크 충돌 시 IntegrityError 발생)
+
+    ✅ reminder_sent_at(중복 발송 방지용)은 기본 None 상태로 생성됨.
     """
     for _ in range(MAX_RETRY):
         new_num = _next_compact_todo_num(db, owner_id)
@@ -59,6 +61,7 @@ def create_todo_compact(
             task=task,
             due_date=due_date,
             due_time=due_time,
+            # reminder_sent_at은 기본 None (아직 알림 발송 전)
         )
         db.add(row)
         try:
@@ -174,11 +177,21 @@ def delete_todo_by_num(db: Session, owner_id: str, todo_num: int) -> bool:
 def toggle_complete(db: Session, owner_id: str, todo_num: int) -> Optional[ToDoList]:
     """
     완료/미완료 토글
+
+    ✅ 추가:
+    - 완료 -> 미완료로 되돌릴 때 reminder_sent_at을 None으로 초기화
+      (다시 30분전 푸시 대상이 될 수 있으므로)
     """
     row = get_todo_by_num(db, owner_id, todo_num)
     if not row:
         return None
+
     row.is_completed = not row.is_completed
+
+    # ✅ 미완료로 돌아오면 다시 알림 가능하도록 초기화
+    if row.is_completed is False:
+        row.reminder_sent_at = None
+
     db.commit()
     return row
 
@@ -194,6 +207,10 @@ def update_todo(
 ) -> Optional[ToDoList]:
     """
     날짜/시간/task 부분 수정
+
+    ✅ 추가:
+    - due_date 또는 due_time이 바뀌면 reminder_sent_at을 None으로 초기화
+      (새 시간 기준으로 다시 30분 전 알림을 보내야 하니까)
     """
     row = get_todo_by_num(db, owner_id, todo_num)
     if not row:
@@ -201,10 +218,14 @@ def update_todo(
 
     if task is not None:
         row.task = task
+
     if due_date is not None:
         row.due_date = due_date
+        row.reminder_sent_at = None  # ✅ 날짜 변경 시 리마인더 초기화
+
     if due_time is not None:
         row.due_time = due_time
+        row.reminder_sent_at = None  # ✅ 시간 변경 시 리마인더 초기화
 
     db.commit()
     return row

@@ -15,12 +15,21 @@ from src.routers import auth, profile, ai_profile, challenge, chat_lists, chat_m
 from src.db.database import engine, Base, SessionLocal
 from src.routers import notifications
 
+# ✅ 추가: FCM 토큰 라우터
+from src.routers import fcm
+
+# ✅ 추가: 투두 30분 전 알림 처리 서비스
+from src.services.todo_reminders import process_due_todo_reminders
+
 import os
 import firebase_admin
 from firebase_admin import credentials
 
-# 테이블 생성 (알렘빅 쓰면 이 줄은 빼도 됨)
-Base.metadata.create_all(bind=engine)
+
+# ✅ 추가: create_all이 fcm_tokens 테이블을 인식하도록 모델 import (중요)
+# (create_all은 "테이블 생성"만 하고 기존 테이블 컬럼 추가는 못함)
+import src.models.fcm_token  # noqa: F401
+
 
 
 @asynccontextmanager
@@ -49,11 +58,12 @@ async def lifespan(app: FastAPI):
     - 매일 00:00 KST마다 '어제 이전 daily 기록' 삭제
       (daily_challenge_picks, daily_challenge_user_states)
     - 매일 00:00 KST마다 '3일 지난 notifications' 삭제
+    - ✅ 매 1분마다 '투두 due_time 30분 전' 푸시 발송
     - 앱 종료 시 스케줄러 종료
     """
     scheduler = AsyncIOScheduler(timezone=ZoneInfo("Asia/Seoul"))
 
-    def _job():
+    def _cleanup_job():
         db = SessionLocal()
         try:
             # 🔹 하루 지난 daily 기록 삭제
@@ -89,14 +99,38 @@ async def lifespan(app: FastAPI):
 
         except Exception as e:
             db.rollback()
-            print(f"[스케줄러 오류] {e}")
+            print(f"[스케줄러 오류][cleanup] {e}")
         finally:
             db.close()
 
-    # 매일 00:00에 실행
-    scheduler.add_job(_job, CronTrigger(hour=0, minute=0))
-    # 테스트용으로 30초마다 돌려보고 싶으면 아래 라인 잠깐 쓰면 됨
-    # scheduler.add_job(_job, CronTrigger(second="*/30"))
+    def _todo_reminder_job():
+        """
+        ✅ 매 1분마다 실행:
+        - 'due_time이 있는 투두' 중에서
+        - '현재 + 30분'에 해당하는 것들을 찾아
+        - FCM 푸시 발송
+        - 중복 방지를 위해 todo_lists.reminder_sent_at을 사용
+        """
+        db = SessionLocal()
+        try:
+            sent = process_due_todo_reminders(db, minutes_before=30)
+            if sent:
+                print(f"[스케줄러] todo 30분전 푸시 발송 sent={sent}")
+        except Exception as e:
+            # 서비스 내부에서 rollback/continue를 하더라도, 안전하게 여기서도 한번 더 방어
+            db.rollback()
+            print(f"[스케줄러 오류][todo_reminder] {e}")
+        finally:
+            db.close()
+
+    # ✅ 매일 00:00에 정리 실행
+    scheduler.add_job(_cleanup_job, CronTrigger(hour=0, minute=0))
+
+    # ✅ 매 1분마다(매 분 0초) 투두 리마인더 실행
+    scheduler.add_job(_todo_reminder_job, CronTrigger(second=0))
+
+    # 테스트용으로 빠르게 돌려보고 싶으면 아래 라인 잠깐 쓰면 됨
+    # scheduler.add_job(_todo_reminder_job, CronTrigger(second="*/10"))
 
     scheduler.start()
 
@@ -135,6 +169,9 @@ app.include_router(health.router)
 app.include_router(item.router)
 app.include_router(background.router)
 app.include_router(notifications.router)
+
+# ✅ 추가: FCM 토큰 등록/해제 라우터
+app.include_router(fcm.router)
 
 # 확인용 엔드포인트
 @app.get("/")
