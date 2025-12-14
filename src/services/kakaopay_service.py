@@ -40,7 +40,7 @@ def _pick_default_redirect(
     if client_hint == "app":
         return redirect.get("app") or redirect.get("mobile") or redirect.get("pc")
 
-    # 힌트 없으면: 모바일 사용자 가정(app->mobile->pc) (RN에서 쓰기 좋음)
+    # 힌트 없으면 모바일 사용자 가정(app->mobile->pc)
     return redirect.get("app") or redirect.get("mobile") or redirect.get("pc")
 
 
@@ -52,7 +52,6 @@ async def kakaopay_ready(
     item_name: str = "Premium",
     quantity: int = 1,
     tax_free_amount: int = 0,
-    # ✅ 추가: PC/모바일 테스트 구분하고 싶으면 라우터에서 넘겨줄 수 있음(선택)
     client_hint: Optional[Literal["pc", "mobile", "app"]] = None,
 ) -> Dict[str, Any]:
     if amount <= 0:
@@ -88,29 +87,25 @@ async def kakaopay_ready(
 
     data = r.json()
     tid = data.get("tid")
+    if not tid:
+        raise KakaoPayError(f"ready response missing tid: {data}")
 
-    # ✅ URL 3종을 모두 꺼내서 내려준다 (PC 테스트 가능)
     redirect = {
         "app": data.get("next_redirect_app_url"),
         "mobile": data.get("next_redirect_mobile_url"),
         "pc": data.get("next_redirect_pc_url"),
     }
-
-    if not tid:
-        raise KakaoPayError(f"ready response missing tid: {data}")
-
     if not any(redirect.values()):
         raise KakaoPayError(f"ready response missing redirect urls: {data}")
 
-    # ✅ 기본 선택 URL (옵션)
     redirect_url = _pick_default_redirect(redirect, client_hint=client_hint)
     if not redirect_url:
         raise KakaoPayError(f"ready response missing redirect_url after pick: {data}")
 
-    # tid 저장
+    # ✅ DB에 tid 저장(approve에 필요)
     row = KakaoPayPayment(
         order_id=order_id,
-        user_id=user.cognito_id,
+        user_id=user.cognito_id,  # ✅ 나중에 콜백에서 여기 값으로 user를 찾음
         tid=tid,
         amount=amount,
         status="READY",
@@ -122,40 +117,38 @@ async def kakaopay_ready(
     return {
         "order_id": order_id,
         "tid": tid,
-        # ✅ 앱/PC 모두 테스트할 수 있게 3종 제공
         "redirect": redirect,
-        # ✅ 이전 호환용: redirect_url도 같이 준다(기본 선택)
         "redirect_url": redirect_url,
     }
 
 
-async def kakaopay_approve(
+# ✅ 핵심: 카카오 콜백(success)에서 Authorization 없이도 승인 가능하도록
+async def kakaopay_approve_by_order_id(
     *,
     db: Session,
-    user: User,
     order_id: str,
     pg_token: str,
 ) -> Dict[str, Any]:
     pay: Optional[KakaoPayPayment] = (
         db.query(KakaoPayPayment)
-        .filter(
-            KakaoPayPayment.order_id == order_id,
-            KakaoPayPayment.user_id == user.cognito_id,
-        )
+        .filter(KakaoPayPayment.order_id == order_id)
         .first()
     )
     if not pay:
         raise KakaoPayError("payment not found (invalid order_id)")
 
+    # 멱등 처리(redirect가 두 번 들어오거나 새로고침해도 안전)
     if pay.status == "APPROVED":
-        # 멱등 처리(두 번 들어와도 OK)
         return {"status": "already_approved", "order_id": order_id}
+
+    # ✅ ready 때 저장해둔 user_id를 partner_user_id로 사용(ready와 approve 일치 보장)
+    partner_user_id = pay.user_id
 
     payload = {
         "cid": kakaopay_settings.kakaopay_cid,
         "tid": pay.tid,
         "partner_order_id": order_id,
-        "partner_user_id": user.cognito_id,
+        "partner_user_id": partner_user_id,
         "pg_token": pg_token,
     }
 
@@ -171,20 +164,38 @@ async def kakaopay_approve(
 
     data = r.json()
 
+    # 결제 승인 처리
     pay.status = "APPROVED"
     pay.approve_raw = json.dumps(data, ensure_ascii=False)
 
-    # 핵심 요구사항: 결제 시점에 premium true
-    user.is_premium = True
+    # ✅ 유저 프리미엄 활성화
+    user = db.query(User).filter(User.cognito_id == partner_user_id).first()
+    if user:
+        user.is_premium = True
 
     db.commit()
-    db.refresh(user)
 
     return {
         "status": "approved",
         "order_id": order_id,
-        "is_premium": user.is_premium,
+        "is_premium": True,
     }
+
+
+# (옵션) 나중에 "앱이 직접 approve"할 수도 있으니 남겨둠
+async def kakaopay_approve(
+    *,
+    db: Session,
+    user: User,
+    order_id: str,
+    pg_token: str,
+) -> Dict[str, Any]:
+    """
+    앱이 직접 approve를 호출하는 구조가 필요할 때 사용 가능.
+    지금 구조(카카오 redirect 콜백)에서는 approve_by_order_id를 쓰는게 안전.
+    """
+    # user를 받아도, 결국 order_id 기준으로 처리하는 게 멱등/안전함
+    return await kakaopay_approve_by_order_id(db=db, order_id=order_id, pg_token=pg_token)
 
 
 def mark_canceled(db: Session, order_id: str) -> None:

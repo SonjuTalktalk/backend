@@ -13,7 +13,7 @@ from src.config.kakaopay_settings import kakaopay_settings
 from src.services.kakaopay_service import (
     KakaoPayError,
     kakaopay_ready,
-    kakaopay_approve,
+    kakaopay_approve_by_order_id,
     mark_canceled,
     mark_failed,
 )
@@ -39,14 +39,13 @@ class ReadyRequest(BaseModel):
 @router.post("/ready", status_code=200)
 async def ready_payment(
     body: ReadyRequest,
-    # ✅ 선택: PC/모바일 어떤 URL을 기본으로 줄지 지정할 수도 있음
-    # 프론트가 안 보내면 서버는 기본값(app->mobile->pc)로 골라줌
+    # ✅ 선택: pc|mobile|app (PC 테스트 편하게)
     client: str | None = Query(default=None, description="pc|mobile|app (선택)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    ✅ [1단계] 결제 준비(Ready)
+    ✅ [1단계] 결제 준비(Ready)  (프론트가 직접 호출하는 엔드포인트)
 
     📌 언제 호출하나요? (프론트 구현 포인트)
     - 사용자가 "프리미엄 결제" 버튼을 눌렀을 때
@@ -56,7 +55,7 @@ async def ready_payment(
     - Headers:
         Authorization: Bearer <Cognito Access Token>
         Content-Type: application/json
-    - Body (예시):
+    - Body 예시:
         {
           "amount": 3900,
           "item_name": "Premium",
@@ -69,33 +68,22 @@ async def ready_payment(
     - quantity: 수량 (선택, 기본 1)
     - tax_free_amount: 비과세 금액 (선택, 기본 0)
     
-    
     📌 서버 내부 동작 방식
     1) get_current_user()가 Authorization 토큰을 검증하고,
        현재 로그인 유저를 current_user로 주입합니다.
-    2) 서버가 카카오페이 'ready' API를 호출합니다.
-       - 카카오페이가 'tid'와 'redirect URL(결제창 URL)'을 반환합니다.
-    3) 서버는 DB에 결제 트랜잭션(order_id, tid, amount, status=READY)을 저장합니다.
-       - order_id: 서버가 생성한 주문 ID (partner_order_id)
-       - tid: 카카오페이 트랜잭션 ID (approve에 필요!)
-    4) 프론트에게 결제창 URL을 반환합니다.
+    2) 카카오페이 ready API 호출 → tid, redirect URL들 반환
+    3) DB에 order_id/tid/status=READY 저장 (approve에 필요!)
 
-    📌 응답 의미 (프론트가 제일 중요)
-    - redirect.pc: PC 브라우저에서 열 URL
-    - redirect.mobile: 모바일 웹 결제 URL
-    - redirect.app: 카카오페이 앱으로 넘기는 URL
-    - redirect_url: 서버가 기본으로 골라준 URL (호환용)
-
-    ✅ 프론트에서 뭘 열어야 하나요?
-    - PC 테스트: redirect.pc 열기
-    - RN(안드/ios): redirect.app 우선(없으면 mobile)
+    📌 응답에서 프론트가 해야할 것
+    - PC 테스트: redirect.pc를 브라우저로 열기
+    - RN(안드/ios): redirect.app 우선 열기(없으면 redirect.mobile)
     """
     try:
         hint = None
         if client in ("pc", "mobile", "app"):
             hint = client  # type: ignore
 
-        data = await kakaopay_ready(
+        return await kakaopay_ready(
             db=db,
             user=current_user,
             amount=body.amount,
@@ -104,55 +92,42 @@ async def ready_payment(
             tax_free_amount=body.tax_free_amount,
             client_hint=hint,
         )
-        return data
-
     except KakaoPayError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/success", status_code=200)
 async def payment_success(
-    pg_token: str = Query(..., description="카카오페이가 붙여주는 토큰(성공 시)"),
-    order_id: str = Query(..., description="ready 때 서버가 만든 주문ID"),
+    pg_token: str = Query(..., description="카카오페이가 붙여주는 pg_token"),
+    order_id: str = Query(..., description="ready 때 서버가 생성한 주문ID"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """
     ✅ [2단계] 결제 성공 리다이렉트 (Kakao → Server)
 
     ⚠️ 프론트가 직접 호출하는 엔드포인트가 아닙니다.
-    - 카카오페이가 결제 성공 후, 자동으로 이 URL로 이동시킵니다.
-    - URL 형태:
-      GET /pay/kakaopay/success?pg_token=...&order_id=...
+    - 카카오페이 결제 완료 후 브라우저/WebView가 자동으로 이 URL로 이동합니다.
+    - 이 요청에는 Authorization 헤더가 없습니다. (그래서 인증 의존하면 401로 approve가 안 돎)
 
-    📌 서버 내부 동작 방식
-    1) pg_token + order_id를 받습니다.
-    2) DB에서 order_id로 결제 트랜잭션을 찾고 tid를 얻습니다.
-    3) 카카오페이 approve API를 호출해 결제를 최종 승인합니다.
-    4) 승인 성공 시:
-       - kakaopay_payments.status = APPROVED
-       - users.is_premium = True   
-    5) (선택) 딥링크가 설정되어 있으면 앱으로 302 redirect 시킵니다.
-       - 예: sonjutoktok://pay/result?status=approved&order_id=...
+    📌 서버 내부 동작
+    1) order_id로 DB에서 결제 row 찾기 (tid + user_id 확보)
+    2) pg_token + tid로 카카오 approve API 호출
+    3) 승인 성공 시:
+       - 결제 status = APPROVED
+       - users.is_premium = True
 
-    📌 프론트 입장에서는 뭐 하면 되나요?
-    - 보통은 앱에서 결제 후, 서버가 딥링크로 앱을 열어주게 하면 편함.
-    - 딥링크 안 쓰면: 웹뷰 화면에 "결제 완료" HTML이 남아있게 됨.
+    📌 응답
+    - (선택) 딥링크 설정 시: 앱으로 302 redirect
+    - 딥링크 없으면: "결제 완료" HTML 페이지 표시
     """
     try:
-        result = await kakaopay_approve(
-            db=db,
-            user=current_user,
-            order_id=order_id,
-            pg_token=pg_token,
-        )
+        await kakaopay_approve_by_order_id(db=db, order_id=order_id, pg_token=pg_token)
 
-        # ✅ 딥링크로 앱 복귀 옵션
+        # ✅ 딥링크로 앱 복귀(선택)
         if kakaopay_settings.kakaopay_app_return_scheme:
             url = f"{kakaopay_settings.kakaopay_app_return_scheme}?status=approved&order_id={order_id}"
             return RedirectResponse(url=url, status_code=302)
 
-        # 딥링크 없으면 브라우저에 간단 페이지 표시
         return HTMLResponse(
             f"""
             <html><body>
@@ -169,7 +144,7 @@ async def payment_success(
 
 @router.get("/cancel", status_code=200)
 def payment_cancel(
-    order_id: str = Query(..., description="ready 때 서버가 만든 주문ID"),
+    order_id: str = Query(..., description="ready 때 서버가 생성한 주문ID"),
     db: Session = Depends(get_db),
 ):
     """
@@ -177,28 +152,42 @@ def payment_cancel(
 
     ⚠️ 프론트가 직접 호출하는 엔드포인트가 아닙니다.
     - 사용자가 결제창에서 '취소'를 누르면 카카오가 이 URL로 이동시킵니다.
+    - 이 요청에도 Authorization은 없습니다.
 
     📌 서버 내부 동작
-    - DB에서 해당 결제의 status를 CANCELED로 기록합니다.
-    - (필요하면) 프론트는 이후 /me 같은 API로 premium 여부를 확인하면 됨.
+    - DB에서 해당 결제 status를 CANCELED로 기록
+
+    📌 (선택) 딥링크 복귀
+    - 설정되어 있으면 앱으로 302 redirect
     """
     mark_canceled(db, order_id)
+
+    if kakaopay_settings.kakaopay_app_return_scheme:
+        url = f"{kakaopay_settings.kakaopay_app_return_scheme}?status=canceled&order_id={order_id}"
+        return RedirectResponse(url=url, status_code=302)
+
     return HTMLResponse("<html><body><h3>결제가 취소되었습니다.</h3></body></html>")
 
 
 @router.get("/fail", status_code=200)
 def payment_fail(
-    order_id: str = Query(..., description="ready 때 서버가 만든 주문ID"),
+    order_id: str = Query(..., description="ready 때 서버가 생성한 주문ID"),
     db: Session = Depends(get_db),
 ):
     """
     ✅ 결제 실패 리다이렉트 (Kakao → Server)
 
     ⚠️ 프론트가 직접 호출하는 엔드포인트가 아닙니다.
-    - 결제 실패/시간초과 등 상황에서 카카오가 이 URL로 이동시킵니다.
+    - 결제 실패/시간초과 등의 상황에서 카카오가 이 URL로 이동시킵니다.
+    - 이 요청에도 Authorization은 없습니다.
 
     📌 서버 내부 동작
-    - DB에서 해당 결제의 status를 FAILED로 기록합니다.
+    - DB에서 해당 결제 status를 FAILED로 기록
     """
     mark_failed(db, order_id)
+
+    if kakaopay_settings.kakaopay_app_return_scheme:
+        url = f"{kakaopay_settings.kakaopay_app_return_scheme}?status=failed&order_id={order_id}"
+        return RedirectResponse(url=url, status_code=302)
+
     return HTMLResponse("<html><body><h3>결제가 실패했습니다.</h3></body></html>")
