@@ -31,7 +31,7 @@ from firebase_admin import credentials
 # (create_all은 "테이블 생성"만 하고 기존 테이블 컬럼 추가는 못함)
 import src.models.fcm_token  # noqa: F401
 
-
+Base.metadata.create_all(bind=engine) # <- 이거 지우지 마세요 SQLAlchemy로 정의한 DB 테이블 DBMS에서 생성해주는 코드입니다
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

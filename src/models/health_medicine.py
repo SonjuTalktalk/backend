@@ -1,6 +1,6 @@
 # src/models/health_medicine.py
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey, String, Date, SmallInteger
+from sqlalchemy import ForeignKey, String, Date, SmallInteger, Index
 from datetime import date
 from src.db.database import Base
 
@@ -29,9 +29,18 @@ class HealthMedicine(Base):
         nullable=False
     )
 
-    medicine_date: Mapped[date] = mapped_column(
+    medicine_start_date: Mapped[date] = mapped_column(
         Date,
         primary_key=True
+    )
+
+    medicine_end_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_medicine_end_date", "medicine_end_date"),
     )
 
     user = relationship("User", back_populates="health_medicine")

@@ -12,7 +12,8 @@ from src.services.medicine import create_medicine_routine
 from src.schemas.schema_medicine import (
     CreateHealthMemo, 
     ResponseHealthMemo, 
-    RoutineHealthMedicine, 
+    CreateRoutineHealthMedicine, 
+    GetRoutineHealthMedicine, 
     CreateHealthMedicine,
     ScannedHealthMedicine,
     ResponseScannedMedicine,
@@ -187,7 +188,8 @@ def create_health_medicine(
     "medicine_name": "약이름", \n
     "medicine_daily": "3(하루 세 번)", \n
     "medicine_period": "3(3일치)", \n
-    "medicine_date": "2025-12-01" \n
+    "medicine_start_date": "2025-12-01" \n
+    "medicine_end_date": "2025-12-03" \n
     } \n
     
     ### 2. 등록 실패 \n
@@ -197,7 +199,8 @@ def create_health_medicine(
     "medicine_name": "약이름", \n
     "medicine_daily": "3(하루 세 번)", \n
     "medicine_period": "3(3일치)", \n
-    "medicine_date": "2025-12-01" \n
+    "medicine_start_date": "2025-12-01" \n
+    "medicine_end_date": "2025-12-03" \n
     } \n
     """
     

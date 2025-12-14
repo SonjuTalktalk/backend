@@ -11,17 +11,24 @@ class ResponseHealthMemo(BaseModel):
     memo_date: date
     status: str
 
-class RoutineHealthMedicine(BaseModel):
+class CreateRoutineHealthMedicine(BaseModel):
     medicine_name: str
     medicine_daily: int
     medicine_period: int
-    medicine_date: date
+    medicine_start_date: date
+
+class GetRoutineHealthMedicine(BaseModel):
+    medicine_name: str
+    medicine_daily: int
+    medicine_period: int
+    medicine_start_date: date
+    medicine_end_date: date
 
 class CreateHealthMedicine(BaseModel):
-    target: List[RoutineHealthMedicine]
+    target: List[CreateRoutineHealthMedicine]
 
 class ResponseGetMedicine(BaseModel):
-    result: List[RoutineHealthMedicine]
+    result: List[GetRoutineHealthMedicine]
 
 class ScannedHealthMedicine(BaseModel):
     medicine_name: str
@@ -38,7 +45,8 @@ class ResponseRoutineMedicine(BaseModel):
     medicine_name: str
     medicine_daily: int
     medicine_period: int
-    medicine_date: date
+    medicine_start_date: date
+    medicine_end_date: date
 
 class ResponseHealthMedicine(BaseModel):
     response: List[ResponseRoutineMedicine]

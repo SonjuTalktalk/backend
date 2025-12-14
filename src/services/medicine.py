@@ -5,19 +5,19 @@ from typing import List
 from src.models.health_medicine import HealthMedicine
 from src.models.users import User
 from src.schemas.schema_medicine import (
-    RoutineHealthMedicine,
+    CreateRoutineHealthMedicine,
     ResponseRoutineMedicine
 )
+from datetime import timedelta
 
-
-def create_medicine_routine(db: Session, bodies: List[RoutineHealthMedicine], current_user: User) -> ResponseRoutineMedicine:
+def create_medicine_routine(db: Session, bodies: List[CreateRoutineHealthMedicine], current_user: User) -> ResponseRoutineMedicine:
     response = []
     for body in bodies:
         routine = db.query(HealthMedicine).filter(
             and_(
                 HealthMedicine.cognito_id == current_user.cognito_id,
                 HealthMedicine.medicine_name == body.medicine_name,
-                HealthMedicine.medicine_date == body.medicine_date
+                HealthMedicine.medicine_start_date == body.medicine_start_date
             )
         ).first()
 
@@ -33,7 +33,8 @@ def create_medicine_routine(db: Session, bodies: List[RoutineHealthMedicine], cu
                     medicine_name = body.medicine_name,
                     medicine_daily = body.medicine_daily,
                     medicine_period = body.medicine_period,
-                    medicine_date = body.medicine_date
+                    medicine_start_date = body.medicine_start_date,
+                    medicine_end_date = body.medicine_start_date + timedelta(days=body.medicine_period - 1)
                 )
             )
             
@@ -43,7 +44,8 @@ def create_medicine_routine(db: Session, bodies: List[RoutineHealthMedicine], cu
                 medicine_name=body.medicine_name,
                 medicine_daily=body.medicine_daily,
                 medicine_period=body.medicine_period,
-                medicine_date=body.medicine_date,
+                medicine_start_date = body.medicine_start_date,
+                medicine_end_date = body.medicine_start_date + timedelta(days=body.medicine_period - 1)
             )
 
             db.add(new_routine)
@@ -54,7 +56,8 @@ def create_medicine_routine(db: Session, bodies: List[RoutineHealthMedicine], cu
                     medicine_name = new_routine.medicine_name,
                     medicine_daily = new_routine.medicine_daily,
                     medicine_period = new_routine.medicine_period,
-                    medicine_date = new_routine.medicine_date
+                    medicine_start_date = body.medicine_start_date,
+                    medicine_end_date = body.medicine_start_date + timedelta(days=body.medicine_period - 1)
                 )
             )
     db.commit()
