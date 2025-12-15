@@ -11,3 +11,4 @@ from src.models.item_buy_list import ItemBuyList
 from src.models.background_list import BackgroundList
 from src.models.background_buy_list import BackgroundBuyList
 from src.models.notification import Notification
+from src.models.fcm_token import FcmToken
