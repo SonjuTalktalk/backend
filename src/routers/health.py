@@ -46,9 +46,11 @@ def create_health_memo(
     db: Session = Depends(get_db),
 ):
     """
-    응답 메시지
+    ### 응답 메시지
     1. 기존에 있는 일지를 수정한 경우: '건강 요약 일지가 수정되었습니다.'
-    2. 새로운 일지를 작성한 경우: '건강 요약 일지가 등록되었습니다.'
+    2. 일지가 있는 날짜에 내용을 비워서 제출한 경우: '건강 요약 일지가 삭제되었습니다.'
+    3. 새 일지를 등록해야 하는데 내용이 비어있는 경우: '등록할 일지 내용이 없습니다.' -> 400 Bad Request
+    4. 새로운 일지를 작성한 경우: '건강 요약 일지가 등록되었습니다.'
     """
 
     if len(body.memo_text.encode('utf-8')) > MAX_TEXT_BYTES:
@@ -67,38 +69,56 @@ def create_health_memo(
     analysis = HealthService()
 
     # 1. 기존에 작성한 메모를 수정한거라면 원래 튜플에서 memo_text만 수정
-    if memo:
+    if memo and body.memo_text:
         memo.memo_text = body.memo_text
         memo.status = analysis.analyze_health_memo(body.memo_text)["status"]
         db.commit()
         db.refresh(memo)
 
-        response = ResponseHealthMemo(
+        return ResponseHealthMemo(
             response_message = "건강 요약 일지가 수정되었습니다.",
             memo_text = memo.memo_text,
             memo_date = memo.memo_date,
             status = memo.status
         )
-        
-        
-    # 2. 새로 작성한 메모라면 새 튜플 추가 
-    else:
-        new_memo = HealthMemo(
-            cognito_id=current_user.cognito_id,
-            memo_date=body.memo_date,
-            memo_text=body.memo_text,
-            status=analysis.analyze_health_memo(body.memo_text)["status"]
-        )
-        db.add(new_memo)
-        db.commit()
-        db.refresh(new_memo)
-
+    # 2. 기존에 작성한 메모를 비워서 제출하면 메모 삭제    
+    if memo and not body.memo_text:
         response = ResponseHealthMemo(
-            response_message = "건강 요약 일지가 등록되었습니다.",
-            memo_text = new_memo.memo_text,
-            memo_date = new_memo.memo_date,
-            status = new_memo.status
+            response_message = "건강 요약 일지가 삭제되었습니다.",
+            memo_text = memo.memo_text,
+            memo_date = memo.memo_date,
+            status = memo.status
         )
+        db.delete(memo)
+        db.commit()
+
+        return response
+
+    # 3. 새로 작성하는 메모인데 내용이 없으면 400 Bad Request
+    if not memo and not body.memo_text:
+        raise HTTPException(
+            status_code=400, 
+            detail="등록할 일지 내용이 없습니다."
+        )
+    
+    # 4. 새로 작성하는 메모이면 등록
+    
+    new_memo = HealthMemo(
+        cognito_id=current_user.cognito_id,
+        memo_date=body.memo_date,
+        memo_text=body.memo_text,
+        status=analysis.analyze_health_memo(body.memo_text)["status"]
+    )
+    db.add(new_memo)
+    db.commit()
+    db.refresh(new_memo)
+
+    return ResponseHealthMemo(
+        response_message = "건강 요약 일지가 등록되었습니다.",
+        memo_text = new_memo.memo_text,
+        memo_date = new_memo.memo_date,
+        status = new_memo.status
+    )
         
     return response
    
