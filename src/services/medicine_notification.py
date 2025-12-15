@@ -1,11 +1,14 @@
 # src/services/medicine_notificiation.py
 import sys
 import enum
+import os
 from dotenv import load_dotenv
 from src.db.database import SessionLocal
 from src.models.health_medicine import HealthMedicine
 from src.services.fcm_push import send_push_to_user
 import logging
+import firebase_admin
+from firebase_admin import credentials
 
 load_dotenv()
 
@@ -14,6 +17,11 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
+
+key_path = "/home/ec2-user/backup/backend/firebase-key.json"
+if not firebase_admin._apps:
+    cred = credentials.Certificate(key_path)
+    firebase_admin.initialize_app(cred)
 
 class MedicineTime(str, enum.Enum):
         morning = "morning" # 오전 8시
@@ -59,12 +67,12 @@ def send_medicine_notification(requested_time: MedicineTime):
                 body = body,
                 data = data,
             )
-            logging.info(f"success: {success}, fail: {fail}, deactivated: {deactivated}")
+            #logging.info(f"success: {success}, fail: {fail}, deactivated: {deactivated}")
             
             if success > 0:
                 logging.info(f"[target]: {routine.cognito_id}, [medicine]: {routine.medicine_name}")
         
-        logging.info("동작 완료")
+        logging.info("알림 완료")
 
 
 if __name__ == "__main__":
