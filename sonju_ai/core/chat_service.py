@@ -19,10 +19,10 @@ _SHARED_TODO_PROCESSOR = TodoProcessor()
 # 🆕 성격(model_type)별 TTS 음성 매핑
 # - AiProfile.personality 값(friendly/active/pleasant/reliable)과 키를 맞춤
 VOICE_MAPPING = {
-    "friendly": "nova",
-    "active": "shimmer",
-    "pleasant": "alloy",
-    "reliable": "onyx",
+    "friendly": "sage",
+    "active": "coral",
+    "pleasant": "nova",
+    "reliable": "verse",
 }
 
 
