@@ -120,7 +120,7 @@ async def lifespan(app: FastAPI):
         """
         db = SessionLocal()
         try:
-            sent = process_due_todo_reminders(db, minutes_before=30)
+            sent = process_due_todo_reminders(db, minutes_before=1)
             if sent:
                 print(f"[스케줄러] todo 30분전 푸시 발송 sent={sent}")
         except Exception as e:
@@ -134,10 +134,10 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(_cleanup_job, CronTrigger(hour=0, minute=0))
 
     # ✅ 매 1분마다(매 분 0초) 투두 리마인더 실행
-    scheduler.add_job(_todo_reminder_job, CronTrigger(second=0))
+    #scheduler.add_job(_todo_reminder_job, CronTrigger(second=0))
 
     # 테스트용으로 빠르게 돌려보고 싶으면 아래 라인 잠깐 쓰면 됨
-    # scheduler.add_job(_todo_reminder_job, CronTrigger(second="*/10"))
+    scheduler.add_job(_todo_reminder_job, CronTrigger(second="*/10"))
 
     scheduler.start()
 
